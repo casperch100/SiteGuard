@@ -1,0 +1,56 @@
+name: 回報漏抓的詐騙網站
+description: 遇到詐騙或仿冒網站，但 SiteGuard 沒有警告
+title: "[漏抓] "
+labels: ["missed-scam"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **如果你已經受騙或轉帳，請先撥打 165 反詐騙諮詢專線。** 這裡的回報不會通報警方。
+
+        **請不要**貼上含有個人資料的完整網址或截圖，也**不要**為了回報再次點開可疑連結。
+  - type: input
+    id: domain
+    attributes:
+      label: 網域
+      description: 可疑網站的網域（建議把 . 改成 [.]，避免變成可點擊的連結，例如 scam[.]shop）
+      placeholder: scam[.]shop
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: 類型
+      options:
+        - 假投資
+        - 假購物
+        - 仿冒官方（銀行、物流、政府機關等）
+        - 假冒品牌的仿冒商品
+        - 博弈
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: 你在哪裡看到這個連結？
+      options:
+        - 簡訊
+        - LINE
+        - Facebook／Instagram 廣告或貼文
+        - 電子郵件
+        - 搜尋結果
+        - 其他
+  - type: dropdown
+    id: siteguard-result
+    attributes:
+      label: SiteGuard 當時的判斷
+      options:
+        - 沒有任何提示
+        - 只顯示可疑，沒有擋下
+        - 不確定
+  - type: textarea
+    id: details
+    attributes:
+      label: 補充說明
+      description: 為什麼你認為這是詐騙網站？

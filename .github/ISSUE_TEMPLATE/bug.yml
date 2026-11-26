@@ -1,0 +1,29 @@
+name: 程式錯誤或功能建議
+description: 擴充功能無法正常運作，或想建議新功能
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 發生了什麼事？
+      description: 錯誤的情況，或你希望新增的功能
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重現步驟
+      placeholder: |
+        1. 打開某個網站
+        2. 點工具列的 SiteGuard 圖示
+        3. 看到……
+  - type: input
+    id: version
+    attributes:
+      label: SiteGuard 版本
+      placeholder: 0.2.0
+  - type: input
+    id: chrome
+    attributes:
+      label: Chrome 版本
+      description: 在網址列輸入 chrome://version 可以看到

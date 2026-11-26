@@ -1,124 +1,94 @@
-# SiteGuard 網站安全檢查（Chrome 擴充功能）
+<p align="center">
+  <img src="icons/icon128.png" width="96" height="96" alt="SiteGuard 圖示">
+</p>
 
-開網站之前先告訴你，這個網站可能是詐騙、仿冒，或其他可疑網站。
-所有判斷都在瀏覽器裡完成，沒有後端，也不會上傳任何使用者資料。
+<h1 align="center">SiteGuard 網站安全檢查</h1>
 
-詐騙網站名單來自**內政部警政署 165 反詐騙諮詢專線**的公開資料（超過 12 萬個網域），擴充功能每週自動更新。
+<p align="center">
+  開網站之前先幫你看一眼：辨識詐騙、仿冒與可疑網站的 Chrome 擴充功能。<br>
+  內建內政部警政署 165 反詐騙諮詢專線公告的 12 萬個涉詐網站，所有判斷都在你的電腦上完成。
+</p>
+
+<p align="center">
+  <a href="#安裝">安裝</a> ·
+  <a href="#隱私">隱私</a> ·
+  <a href="#常見問題">常見問題</a> ·
+  <a href="https://github.com/casperch100/SiteGuard/issues/new/choose">回報問題</a> ·
+  <a href="https://casperch100.github.io/SiteGuard/">隱私權政策</a>
+</p>
+
+---
+
+> **測試版**：SiteGuard 目前處於小範圍試用階段。對「165 名單以外的新詐騙網站」，辨識能力仍在改善中（進度見 [ROADMAP](ROADMAP.md)）。**沒有警告不代表網站一定安全**，遇到可疑情況請撥打 **165 反詐騙諮詢專線**。
 
 ## 功能
 
-| 功能 | 說明 |
-|---|---|
-| 攔截危險網站 | 前往危險網站時先導向警告頁；使用者可以選擇「仍要前往」，本次瀏覽期間就不再攔截該網域 |
-| 工具列 badge | `✓` 可信任、`?` 可疑、`!` 危險；沒有標示代表未發現明顯風險 |
-| Popup | 顯示目前網站的風險分數與原因，也可以查詢其他網址、回報網站；底部顯示 165 名單的資料月份與筆數 |
-| 連結標記 | 頁面上的危險連結加紅框，可疑連結加橘色虛線框；之後才載入的內容（例如聊天訊息）也會掃描 |
-| 滑過提示 | 滑鼠移到連結上，會顯示風險等級與原因 |
-| 右鍵檢查 | 對連結或反白的文字按右鍵，選「用 SiteGuard 檢查」 |
+<p align="center">
+  <img src="store/screenshots/screenshot-2.jpg" width="720" alt="前往 165 公告的涉詐網站時，SiteGuard 顯示警告頁並說明原因">
+</p>
 
-## 判斷方式（`src/lib/risk.js`）
+- **擋下危險網站**：前往 165 公告的涉詐網站，或明顯仿冒官方的網站時，先顯示警告頁，讓你在輸入任何資料前停下來。
+- **工具列即時顯示安全狀態**：`✓` 可信任網站、`?` 可疑、`!` 危險。
+- **標出網頁上的危險連結**：在網頁、網頁版信箱或聊天室裡，危險連結加紅框、可疑連結加橘色虛線框；滑鼠移上去就會顯示原因。
+- **右鍵檢查**：對連結或一段網址按右鍵，選「用 SiteGuard 檢查」。
+- **一鍵回報**：覺得網站有問題就回報，之後再遇到同一個網站會直接提醒你（回報只存在你的電腦上）。
+- **看得懂的原因**：每個判斷都附上原因，例如「已列入 165 反詐騙公告名單：涉詐網站（運輸倉儲）」，不只是一個紅燈。
 
-1. **自己回報過** → 危險（100 分）
-2. 在 **165 涉詐網站名單**中（含子網域）→ 危險（100 分）
-3. 在**白名單**中，或是 `.gov.tw`、`.edu.tw` 網域 → 可信任
-4. **啟發式規則**分數加總：70 分以上為危險，35 分以上為可疑
+<p align="center">
+  <img src="store/screenshots/screenshot-1.jpg" width="720" alt="聊天訊息中的詐騙連結被標成危險，滑鼠移上去顯示原因">
+</p>
 
-| 規則 | 分數 |
-|---|---|
-| 形近字或錯字仿冒官方網域（`paypa1.com`） | 50 |
-| 和官方網站同名但後綴不同（`shopee.top`） | 45 |
-| 用「@」偽裝網址（`www.bank.com@evil.com`） | 45 |
-| 網址含有品牌名稱，但不是官方網站（`line-login-xxx.com`） | 40 |
-| Punycode（國際化字元）網域 | 40 |
-| 直接使用 IP 位址，而不是網域名稱 | 30 |
-| 詐騙網站常用的網域後綴（`.top`、`.xyz`、`.vip` 等） | 15 |
-| 可疑字詞（login、verify、invest 等） | 每個 10，最多 20 |
-| 未使用 HTTPS、連字號過多、子網域層數過多、主機名稱過長 | 各 10 |
+## 安裝
 
-## 165 資料
+**Chrome 線上應用程式商店**：準備上架中，上架後會在這裡提供連結。
 
-| 資料集 | 用途 | 更新 |
-|---|---|---|
-| [165反詐騙諮詢專線_遭停止解析涉詐網站](https://data.gov.tw/dataset/176455) | 主要名單，網站性質（金融保險、電子商務、運輸倉儲…）作為分類 | 每月；擴充功能每週檢查一次 |
-| [165反詐騙諮詢專線_假投資(博弈)網站](https://data.gov.tw/dataset/160055) | 歷史資料（官方已停止更新，改由上面的資料集取代） | 只在內建快照中 |
+**先行試用（開發人員模式）**：
 
-- **內建快照**：`src/data/165-blocklist.txt`（每行「主機名稱<TAB>分類代碼」）與 `src/data/165-meta.json`，由 `tools/update_165.rb` 產生。
-- **自動更新**：Service Worker 每週用 `chrome.alarms` 下載最新的「遭停止解析涉詐網站」CSV，合併後存在 `chrome.storage.local`。下載失敗時繼續使用目前名單。
-- **避免誤擋**：白名單上的網域（例如 `play.google.com`）即使出現在原始資料中也不列入。
-- **授權**：政府資料開放授權條款第 1 版，Popup 與商店說明中標示資料來源。
+1. 下載這個專案：按本頁上方綠色的「**Code**」→「**Download ZIP**」，解壓縮。
+2. 在 Chrome 網址列輸入 `chrome://extensions`。
+3. 開啟右上角的「**開發人員模式**」。
+4. 按「**載入未封裝項目**」，選擇解壓縮後的資料夾。
 
-更新內建快照：
+需要 Chrome 114 以上。
 
-```bash
-ruby -Ku tools/update_165.rb
-```
+## 怎麼判斷
 
-## 安裝（開發者模式）
+1. **165 公告的涉詐網站名單**：內建內政部警政署公開的「遭停止解析涉詐網站」等資料，超過 12 萬個網域，涵蓋假投資、假購物、假冒物流與政府機關等類型，每週自動更新。
+2. **常見的仿冒手法**：不在名單上的網站，也會用規則辨識，例如形近字仿冒官方網址（把 `l` 換成 `1`）、網址含有銀行或購物網站的名稱但不是官方網站、用「@」偽裝網址、詐騙網站常用的網域後綴等。
+3. **你自己的回報**：你回報過的網站，之後都會直接警告。
 
-1. 在 Chrome 開啟 `chrome://extensions`。
-2. 開啟右上角的「**開發人員模式**」。
-3. 按「**載入未封裝項目**」，選擇這個 `site-guard` 資料夾。
+## 隱私
 
-## 試玩 Demo
+- **所有判斷都在你的電腦上完成。** SiteGuard 不會上傳你瀏覽的網址，不使用任何分析或廣告服務，也不收集個人資料。
+- **唯一的對外連線**：每週從政府資料開放平臺（`opdadm.moi.gov.tw`）下載公開的詐騙網站名單。這是單純的檔案下載，不會傳送你的任何資料。
+- 只讀取網頁上**連結的網址**，不讀取文章、表單或帳號密碼等其他內容。
 
-擴充功能只在 `http://` 與 `https://` 網頁上運作，所以測試頁要透過本機伺服器開啟：
+完整說明請看[隱私權政策](https://casperch100.github.io/SiteGuard/)。
 
-```bash
-ruby -run -e httpd . -p 8765
-```
+## 常見問題
 
-然後前往 http://localhost:8765/demo/index.html。測試頁上的危險連結取自 165 名單，而且都已遭停止解析，點了只會看到 SiteGuard 的警告頁。
+**這些網站不是已經被政府封鎖了嗎？為什麼還需要 SiteGuard？**
+名單上的網域大多已被政府「停止解析」。使用台灣電信業者 DNS 的人連過去，會看到政府的封鎖頁。但如果你使用 Google、Cloudflare 等國外 DNS，在 Chrome 開啟「安全 DNS」並指定國外服務、使用 VPN，或人在國外，就可能繞過這個封鎖。我們抽樣檢查，約四成的名單網域透過國外 DNS 仍然連得到。SiteGuard 在瀏覽器裡再擋一次，而且會告訴你原因。
 
-## 測試
+**SiteGuard 說某個正常網站有問題，怎麼辦？**
+請[回報誤判](https://github.com/casperch100/SiteGuard/issues/new?template=false-positive.yml)。在警告頁可以選「我了解風險，仍要前往」，本次瀏覽期間就不會再攔截該網站。
 
-- 有 Node.js：`node --test test/`
-- 沒有 Node.js：先啟動上面的伺服器，再開啟 http://localhost:8765/test/browser.html（執行的是同一份 `test/risk.test.js`，並用真正的 165 快照測試載入速度與白名單是否被誤列）。
+**沒有跳出警告，就代表網站安全嗎？**
+不是。新的詐騙網站可能還沒被列入任何名單，規則也不一定抓得到。輸入帳號密碼、信用卡或轉帳前，請再三確認網址；有疑問請撥打 165。
 
-## 偵測評估
+**SiteGuard 是政府的產品嗎？**
+不是。SiteGuard 是個人開發的開源專案，使用政府公開的資料，判斷結果僅供參考，不代表政府機關的立場。
 
-用和擴充功能同一份偵測引擎，離線計算「新詐騙網站偵測率」與「正常網站誤判率」。目標與進度見 [ROADMAP.md](ROADMAP.md)，最新結果見 [eval/REPORT.md](eval/REPORT.md)，每日趨勢見 `eval/history.csv`。
+## 回報與參與
 
-GitHub Actions 每天自動執行（`.github/workflows/eval.yml`）。本機手動執行：
+- **回報誤判**（正常網站被警告）：[開啟回報](https://github.com/casperch100/SiteGuard/issues/new?template=false-positive.yml)
+- **回報漏抓的詐騙網站**：[開啟回報](https://github.com/casperch100/SiteGuard/issues/new?template=missed-scam.yml)。如果你已經受騙，請先撥打 **165**
+- **程式錯誤或建議**：[開啟回報](https://github.com/casperch100/SiteGuard/issues/new?template=bug.yml)
+- **安全性問題**：請依照 [SECURITY.md](SECURITY.md) 私下回報，不要公開張貼
 
-```bash
-ruby -Ku tools/eval/collect_positives.rb     # 收集 PhishTank 仍在線的釣魚網域（加 --165 download 一併收集 165 新增網域）
-ruby -Ku tools/eval/build_negatives.rb       # 下載 Tranco 熱門網站排行，產生正常網域清單
-ruby -Ku tools/eval/run_local.rb             # 沒有 Node.js 時用無頭 Chrome 執行評估（有 Node.js 可改用 node tools/eval/evaluate.mjs）
-```
+想參與開發，請看[開發文件](docs/DEVELOPMENT.md)與[發展計畫](ROADMAP.md)。版本變更紀錄見 [CHANGELOG](CHANGELOG.md)。
 
-## 專案結構
+## 資料來源與授權
 
-```
-manifest.json              MV3 設定
-src/background.js          Service Worker：攔截、badge、右鍵選單、165 名單載入與每週更新
-src/lib/risk.js            風險判斷引擎（純函式，和測試共用）
-src/lib/blocklist.js       165 名單的解析、查詢、CSV 合併（純函式）
-src/data/rules.js          白名單、品牌清單、可疑後綴與字詞
-src/data/165-blocklist.txt 165 名單內建快照
-src/data/165-meta.json     165 名單的分類、資料月份、來源
-src/popup/                 工具列 Popup（也用作右鍵檢查的視窗）
-src/warning/               危險網站警告頁
-src/content/               網頁上的連結標記與滑過提示
-demo/index.html            Demo 測試頁
-test/                      引擎測試
-icons/                     擴充功能圖示（由 tools/make_icons.rb 產生）
-tools/update_165.rb        下載 165 公開資料並產生內建快照
-tools/pack.sh              打包上架用的 zip（輸出到 dist/）
-tools/eval/                評估工具：收集詐騙網域、產生正常網域清單、計算偵測率與誤判率
-eval/                      評估資料（data/positives.csv）、報告（REPORT.md）、每日趨勢（history.csv）
-ROADMAP.md                 發展計畫與決定
-store/                     上架資料：商店文案、隱私權政策、截圖、送審步驟
-index.html                 GitHub Pages 用的隱私權政策（和 store/privacy-policy.html 相同）
-```
-
-## 上架
-
-請看 [store/SUBMIT.md](store/SUBMIT.md)。
-
-## 已知限制與之後可以做的
-
-- **新詐騙網站**：165 名單是事後公告，剛出現的詐騙網站要靠啟發式規則辨識。
-- **網域年齡**：可以用 RDAP 查詢真實註冊日期，作為額外的判斷依據。
-- **網域解析**：改用完整的 Public Suffix List，取代目前簡化的後綴表。
-- **攔截方式**：改用 `declarativeNetRequest` 規則，比目前的 `webNavigation` 導向更早攔截。
-- **回報**：目前只存在這台電腦。如果要分享給其他使用者，需要後端、防灌票機制與人工審核。
+- 程式碼以 [MIT 授權條款](LICENSE) 釋出。
+- 詐騙網站名單來自**內政部警政署 165 反詐騙諮詢專線**的公開資料（[遭停止解析涉詐網站](https://data.gov.tw/dataset/176455)、[假投資(博弈)網站](https://data.gov.tw/dataset/160055)），依[政府資料開放授權條款第 1 版](https://data.gov.tw/license)使用，不適用 MIT 授權。

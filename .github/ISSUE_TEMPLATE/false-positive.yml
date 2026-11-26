@@ -1,0 +1,45 @@
+name: 回報誤判（正常網站被警告）
+description: SiteGuard 把正常、合法的網站判斷為可疑或危險
+title: "[誤判] "
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        謝謝你的回報！這會幫助我們降低誤判。
+        **請不要**貼上含有個人資料、帳號或訂單編號的完整網址，只要網域（例如 `example.com`）就好。
+  - type: input
+    id: domain
+    attributes:
+      label: 網域
+      description: 被誤判的網站網域
+      placeholder: example.com
+    validations:
+      required: true
+  - type: dropdown
+    id: level
+    attributes:
+      label: SiteGuard 的判斷
+      options:
+        - 危險（跳出警告頁）
+        - 可疑（Popup 或連結標示為可疑）
+    validations:
+      required: true
+  - type: textarea
+    id: reasons
+    attributes:
+      label: 顯示的判斷原因
+      description: 可以直接從 Popup 或警告頁複製
+  - type: textarea
+    id: why-legit
+    attributes:
+      label: 為什麼你認為這是正常網站？
+      description: 例如：這是某某公司的官方網站、我是網站管理者
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SiteGuard 版本
+      description: 在 chrome://extensions 的 SiteGuard 卡片上可以看到
+      placeholder: 0.2.0

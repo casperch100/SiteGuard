@@ -9,7 +9,7 @@
 | 螢幕截圖 1280×800 ×3 | `store/screenshots/screenshot-1.jpg`～`screenshot-3.jpg` |
 | 小型宣傳圖塊 440×280 | `store/screenshots/promo-small.jpg` |
 | 商店文案、權限理由、隱私權欄位 | `store/listing.md` |
-| 隱私權政策 | https://casperch100.github.io/SiteGuard/ （原始檔 `store/privacy-policy.html`，repo 根目錄的 `index.html` 是同一份） |
+| 隱私權政策 | https://casperch100.github.io/SiteGuard/ （原始檔 `docs/index.html`） |
 
 ## 送審前一定要處理的事
 
@@ -26,7 +26,7 @@ ruby -Ku tools/update_165.rb && sh tools/pack.sh
 ```
 
 ### 3. 隱私權政策有改動時，同步到 GitHub Pages
-修改 `store/privacy-policy.html` 後，複製成 repo 根目錄的 `index.html` 並推送，GitHub Pages 會自動更新。
+修改 `docs/index.html` 並推送，GitHub Pages 會自動更新。
 
 ### 4. 確認名稱可以用
 「SiteGuard」這個名字市面上已經有其他資安產品在用。正式公開前，建議先查商標，必要時換名稱。要改的地方：`manifest.json` 的 `name`、`short_name`、`action.default_title`，以及 `store/` 裡的文案和截圖（改完 `compose.html` 再重新截圖）。

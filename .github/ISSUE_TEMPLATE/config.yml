@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 已經受騙或需要協助？請撥打 165 反詐騙諮詢專線
+    url: https://165.npa.gov.tw/
+    about: 內政部警政署 165 全民防騙網，可線上諮詢或通報詐騙
+  - name: 安全性問題（請私下回報）
+    url: https://github.com/casperch100/SiteGuard/security/advisories/new
+    about: 發現 SiteGuard 的安全性漏洞時，請透過這裡私下回報，不要公開張貼
