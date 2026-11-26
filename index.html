@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiteGuard 隱私權政策</title>
+  <style>
+    :root { --bg: #ffffff; --text: #202124; --muted: #5f6368; --border: #dadce0; --accent: #1a73e8; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #202124; --text: #e8eaed; --muted: #9aa0a6; --border: #3c4043; --accent: #8ab4f8; } }
+    body { margin: 0; padding: 32px 16px 64px; background: var(--bg); color: var(--text);
+      font: 16px/1.8 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 28px; margin: 0 0 4px; }
+    h2 { font-size: 19px; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .meta { color: var(--muted); margin: 0 0 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    a { color: var(--accent); }
+    code { font-size: 0.9em; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>SiteGuard 隱私權政策</h1>
+  <p class="meta">生效日期：2026 年 11 月 26 日</p>
+
+  <p>SiteGuard 網站安全檢查（以下簡稱「本擴充功能」）是一個 Chrome 擴充功能，用來提醒使用者可能的詐騙、仿冒與可疑網站。我們重視你的隱私，本政策說明本擴充功能如何處理資料。</p>
+
+  <h2>一句話說明</h2>
+  <p><strong>本擴充功能所有判斷都在你的電腦上完成，不會收集、上傳、出售或分享你的任何資料。</strong></p>
+
+  <h2>本擴充功能會讀取哪些資料</h2>
+  <table>
+    <thead><tr><th>資料</th><th>用途</th><th>是否離開你的電腦</th></tr></thead>
+    <tbody>
+      <tr><td>你正要前往的網址</td><td>在網頁載入前判斷是否為危險網站，必要時顯示警告頁</td><td>否</td></tr>
+      <tr><td>目前分頁的網址</td><td>在工具列顯示安全狀態，並在彈出視窗顯示判斷結果</td><td>否</td></tr>
+      <tr><td>網頁上連結的網址</td><td>標記頁面上的危險或可疑連結，並在滑鼠移上去時顯示說明</td><td>否</td></tr>
+      <tr><td>你反白並選擇檢查的文字</td><td>只在你從右鍵選單選擇「用 SiteGuard 檢查」時，用來判斷該網址</td><td>否</td></tr>
+    </tbody>
+  </table>
+  <p>本擴充功能<strong>不會</strong>讀取網頁中的其他內容（例如文章、表單輸入、帳號密碼），也不會記錄你的瀏覽歷史。</p>
+
+  <h2>本擴充功能會儲存哪些資料</h2>
+  <p>以下資料只儲存在你瀏覽器的擴充功能儲存空間（<code>chrome.storage</code>）中：</p>
+  <ul>
+    <li><strong>你的回報紀錄</strong>：你回報為詐騙的網域與分類。你可以隨時在彈出視窗中取消回報，或移除本擴充功能以刪除全部資料。</li>
+    <li><strong>暫時放行清單</strong>：你在警告頁選擇「仍要前往」的網域。這份清單只在本次瀏覽工作階段有效，關閉瀏覽器後自動清除。</li>
+  </ul>
+
+  <h2>資料分享</h2>
+  <p>本擴充功能不使用任何分析或廣告服務，不連線到任何伺服器，也不會將資料提供給任何第三方。判斷所用的網站名單內建在擴充功能中。</p>
+
+  <h2>符合 Chrome 線上應用程式商店使用者資料政策</h2>
+  <p>本擴充功能對資料的使用遵循 Chrome 線上應用程式商店使用者資料政策（Chrome Web Store User Data Policy），包括「有限使用」（Limited Use）規定：讀取的資料僅用於提供上述網站安全檢查功能，不會轉移、出售，也不會用於廣告或判斷信用。</p>
+
+  <h2>政策變更</h2>
+  <p>若未來版本新增需要連線的功能（例如向伺服器查詢最新的詐騙網站名單），我們會先更新本政策並在擴充功能更新說明中告知，且僅傳送判斷所需的最少資訊。</p>
+
+  <h2>聯絡我們</h2>
+  <p>對本政策有任何問題，請到本專案的 GitHub Issues 頁面留言：<a id="issues-link" href="https://github.com/">GitHub Issues</a></p>
+</main>
+<script>
+  // 頁面放在 https://<帳號>.github.io/<repo>/ 時，自動指向 https://github.com/<帳號>/<repo>/issues
+  (function () {
+    var m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    var repo = location.pathname.split('/').filter(Boolean)[0];
+    if (m && repo) {
+      var url = 'https://github.com/' + m[1] + '/' + repo + '/issues';
+      var a = document.getElementById('issues-link');
+      a.href = url;
+      a.textContent = url;
+    }
+  })();
+</script>
+</body>
+</html>
