@@ -6,6 +6,13 @@ on:
   schedule:
     - cron: '30 1 * * *'   # 每天 UTC 01:30（台灣 09:30）
   workflow_dispatch:        # 也可以在 GitHub 的 Actions 頁面手動執行
+  push:                     # 評估程式或偵測引擎有變更時，自動重跑一次
+    branches: [main]
+    paths:
+      - '.github/workflows/eval.yml'
+      - 'tools/eval/**'
+      - 'src/lib/**'
+      - 'src/data/rules.js'
 
 permissions:
   contents: write           # 需要把評估資料提交回 repo
@@ -44,7 +51,7 @@ jobs:
       - name: Collect new 165 domains
         run: |
           day=$(date -u +%d)
-          if [ "$day" = "01" ] || [ "$day" = "15" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$day" = "01" ] || [ "$day" = "15" ] || [ "${{ github.event_name }}" != "schedule" ]; then
             ruby tools/eval/collect_positives.rb --165 download
           fi
 
