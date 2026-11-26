@@ -1,0 +1,13 @@
+# 打包產物（用 sh tools/pack.sh 重新產生，上傳到商店即可，不放進版本控制）
+dist/
+
+# macOS
+.DS_Store
+
+# 編輯器與本機設定
+.vscode/
+.idea/
+.claude/
+
+# Node（若之後加入建置工具）
+node_modules/

@@ -1,0 +1,18 @@
+/* SiteGuard：標記頁面上的危險／可疑連結 */
+a[data-sg-level="danger"] {
+  outline: 2px solid #d93025 !important;
+  outline-offset: 1px;
+  border-radius: 2px;
+  background-color: rgba(217, 48, 37, 0.08) !important;
+}
+a[data-sg-level="danger"]::before {
+  content: "⚠ 危險 ";
+  color: #d93025;
+  font-weight: 700;
+  font-size: 0.85em;
+}
+a[data-sg-level="suspicious"] {
+  outline: 2px dashed #e37400 !important;
+  outline-offset: 1px;
+  border-radius: 2px;
+}

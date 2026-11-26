@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>Risk engine tests</title>
+  <style>
+    body { margin: 16px; font: 13px/1.5 ui-monospace, Menlo, monospace; background: #fff; color: #202124; }
+    .pass { color: #1e8e3e; } .fail { color: #d93025; font-weight: 700; }
+  </style>
+</head>
+<body>
+<h1 id="summary">Running…</h1>
+<pre id="out"></pre>
+<pre id="dump"></pre>
+<!-- 沒有 Node.js 時的替代方案：用任何靜態伺服器開啟本頁，即可在瀏覽器執行 test/risk.test.js -->
+<script type="module">
+  const results = [];
+  globalThis.__shim = {
+    test(name, fn) {
+      try { fn(); results.push([true, name]); } catch (e) { results.push([false, `${name} :: ${e.message}`]); }
+    },
+    assert: {
+      equal(a, b, m) { if (a !== b) throw new Error(`${m ?? ''} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); },
+    },
+  };
+  // 把 node:test / node:assert 對應到上面的 shim 後執行同一份測試
+  const src = await (await fetch('./risk.test.js')).text();
+  const patched = src
+    .replace("import { test } from 'node:test';", 'const { test } = globalThis.__shim;')
+    .replace("import assert from 'node:assert/strict';", 'const { assert } = globalThis.__shim;')
+    .replace("'../src/lib/risk.js'", `'${new URL('../src/lib/risk.js', location.href)}'`);
+  await import(URL.createObjectURL(new Blob([patched], { type: 'text/javascript' })));
+
+  const fails = results.filter(([ok]) => !ok).length;
+  document.getElementById('summary').textContent = `${results.length - fails} passed, ${fails} failed`;
+  document.getElementById('summary').className = fails ? 'fail' : 'pass';
+  document.getElementById('out').innerHTML = results
+    .map(([ok, n]) => `<span class="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'} ${n}</span>`).join('\n');
+
+  const { assessUrl } = await import('../src/lib/risk.js');
+  const samples = ['https://shopee.top/', 'http://203.0.113.45/bank/login', 'https://www.cathaybk.com.tw@evil-site.example/',
+    'https://paypa1.com/signin', 'https://line-login-secure.com/', 'https://esunbank-tw.online/', 'https://new-coffee-shop.com/',
+    'https://stock-teacher-line.vip/group'];
+  document.getElementById('dump').textContent = samples.map((u) => {
+    const r = assessUrl(u);
+    return `${r.level.padEnd(10)} ${String(r.score).padStart(3)}  ${u}\n` + r.reasons.map((x) => `      - ${x.text} (${x.weight})`).join('\n');
+  }).join('\n');
+</script>
+</body>
+</html>

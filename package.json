@@ -1,0 +1,11 @@
+{
+  "name": "site-guard-poc",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SiteGuard Chrome extension POC — website risk check with mock data",
+  "scripts": {
+    "test": "node --test test/",
+    "serve": "ruby -run -e httpd . -p 8765"
+  }
+}

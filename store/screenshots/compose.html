@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>SiteGuard store screenshots</title>
+  <!--
+    商店截圖排版頁（不會打包進擴充功能）。
+    用本機伺服器開啟：/store/screenshots/compose.html?scene=1|2|3|promo
+    視窗大小設成 1280×800（promo 為 440×280）後截圖。
+  -->
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      width: 1280px; height: 800px; overflow: hidden;
+      background: linear-gradient(135deg, #e8f0fe 0%, #f8f9fa 55%, #fce8e6 100%);
+      color: #202124;
+      font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      display: flex; align-items: center; gap: 48px; padding: 0 64px;
+    }
+    .copy { flex: 0 0 380px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; color: #1a73e8; margin-bottom: 28px; }
+    .brand img { width: 36px; height: 36px; }
+    h1 { font-size: 40px; line-height: 1.3; margin: 0 0 20px; white-space: nowrap; }
+    p { font-size: 20px; line-height: 1.7; margin: 0; color: #5f6368; }
+    .window {
+      position: relative; flex: 1; height: 640px;
+      background: #fff; border-radius: 14px; overflow: hidden;
+      box-shadow: 0 24px 60px rgba(60, 64, 67, 0.25), 0 2px 6px rgba(60, 64, 67, 0.15);
+      display: flex; flex-direction: column;
+    }
+    .bar { flex: none; height: 52px; background: #f1f3f4; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid #dadce0; }
+    .dots { display: flex; gap: 7px; }
+    .dots i { width: 12px; height: 12px; border-radius: 50%; background: #dadce0; }
+    .omnibox { flex: 1; height: 32px; border-radius: 16px; background: #fff; display: flex; align-items: center; padding: 0 14px; font-size: 14px; color: #3c4043; }
+    .ext { position: relative; width: 32px; height: 32px; display: grid; place-items: center; }
+    .ext img { width: 20px; height: 20px; }
+    .ext b { position: absolute; right: -2px; bottom: -1px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; color: #fff; font-size: 11px; line-height: 15px; text-align: center; }
+    .window > iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+    .window > iframe.popup {
+      position: absolute; top: 46px; right: 10px; width: 360px; height: 392px; border: 0; border-radius: 10px;
+      box-shadow: 0 8px 28px rgba(60, 64, 67, 0.35); background: #fff;
+    }
+    /* 小型宣傳圖塊 440×280 */
+    body.promo { width: 440px; height: 280px; padding: 0 36px; gap: 0; background: linear-gradient(135deg, #1a73e8, #174ea6); color: #fff; }
+    body.promo .copy { flex: 1; }
+    body.promo .brand { color: #fff; font-size: 30px; margin-bottom: 14px; }
+    body.promo .brand img { width: 64px; height: 64px; }
+    body.promo p { color: #d2e3fc; font-size: 19px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<script type="module">
+  import { assessUrl } from '/src/lib/risk.js';
+
+  const scene = new URLSearchParams(location.search).get('scene') || '1';
+  const ICON = '/icons/icon128.png';
+  const SCENES = {
+    1: {
+      title: '網頁上的危險連結，<br>一眼就看出來',
+      text: '信箱、聊天室、社群網站裡的詐騙連結會被標出來，滑鼠移上去就知道原因。',
+      address: 'mail.example.com/inbox',
+      badge: ['!', '#d93025'],
+      frame: '/demo/index.html',
+      hover: '.chat a[href="https://etag-fee-pay.top/pay"]',
+      scrollTo: '.chat',
+    },
+    2: {
+      title: '開到詐騙網站之前，<br>先幫你擋下來',
+      text: '已知的詐騙網站、明顯仿冒官方的網站，會在輸入任何資料前先顯示警告。',
+      address: 'etag-fee-pay.top/pay',
+      badge: ['!', '#d93025'],
+      frame: '/src/warning/warning.html?url=' + encodeURIComponent('https://etag-fee-pay.top/pay'),
+      module: '/src/warning/warning.js',
+    },
+    3: {
+      title: '點一下，<br>就知道網站安不安全',
+      text: '每個判斷都附上看得懂的原因：形近字仿冒、新註冊網域、可疑字詞⋯⋯',
+      address: 'paypa1.com/signin',
+      badge: ['!', '#d93025'],
+      frame: '/demo/index.html',
+      popup: 'https://paypa1.com/signin',
+    },
+  };
+
+  if (scene === 'promo') {
+    document.body.className = 'promo';
+    document.body.insertAdjacentHTML('afterbegin', `
+      <div class="copy">
+        <div class="brand"><img src="${ICON}" alt="">SiteGuard</div>
+        <p>開網站前先幫你看一眼<br>辨識詐騙、仿冒與可疑網站</p>
+      </div>`);
+  } else {
+    const s = SCENES[scene];
+    document.body.insertAdjacentHTML('afterbegin', `
+      <div class="copy">
+        <div class="brand"><img src="${ICON}" alt="">SiteGuard 網站安全檢查</div>
+        <h1>${s.title}</h1>
+        <p>${s.text}</p>
+      </div>
+      <div class="window">
+        <div class="bar">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="omnibox">${s.address}</div>
+          <div class="ext"><img src="${ICON}" alt=""><b style="background:${s.badge[1]}">${s.badge[0]}</b></div>
+        </div>
+        <iframe id="page" src="${s.frame}"></iframe>
+        ${s.popup ? '<iframe class="popup" id="popup" src="/src/popup/popup.html"></iframe>' : ''}
+      </div>`);
+
+    // 在 iframe 內提供假的 chrome API，讓擴充功能頁面在一般網頁中也能顯示
+    const stub = (tabUrl) => ({
+      runtime: {
+        getURL: (p) => location.origin + '/' + p,
+        sendMessage: async (m) => {
+          if (m.type === 'checkMany') {
+            const out = {};
+            for (const u of m.urls) {
+              const r = assessUrl(u);
+              if (r.ok) out[r.host] = { level: r.level, score: r.score, reasons: r.reasons.slice(0, 3), category: r.category };
+            }
+            return out;
+          }
+          return assessUrl(m.url);
+        },
+      },
+      tabs: { query: async () => [{ url: tabUrl }] },
+    });
+    const runModule = (win, src) => {
+      const el = win.document.createElement('script');
+      el.type = 'module';
+      el.textContent = `import '${src}?stub=${Date.now()}';`;
+      win.document.body.append(el);
+    };
+
+    document.getElementById('page').addEventListener('load', (e) => {
+      const win = e.target.contentWindow;
+      win.chrome = stub('');
+      if (s.module) runModule(win, s.module);
+      if (s.frame.startsWith('/demo/')) {
+        win.document.querySelector('.lead')?.remove();
+        const css = win.document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = '/src/content/content.css';
+        win.document.head.append(css);
+        const js = win.document.createElement('script');
+        js.src = '/src/content/content.js';
+        win.document.body.append(js);
+      }
+      if (s.scrollTo) win.document.querySelector(s.scrollTo)?.scrollIntoView({ block: 'center' });
+      if (s.hover) {
+        setTimeout(() => {
+          win.document.querySelector(s.hover)?.dispatchEvent(new win.MouseEvent('mouseover', { bubbles: true }));
+        }, 1500);
+      }
+    });
+
+    document.getElementById('popup')?.addEventListener('load', (e) => {
+      const win = e.target.contentWindow;
+      win.chrome = stub(s.popup);
+      runModule(win, '/src/popup/popup.js');
+    });
+  }
+</script>
+</body>
+</html>

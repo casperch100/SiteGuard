@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>危險網站警告 - SiteGuard</title>
+  <link rel="stylesheet" href="warning.css">
+</head>
+<body>
+  <main class="card">
+    <div class="icon" aria-hidden="true">!</div>
+    <h1>這個網站可能是詐騙網站</h1>
+    <p class="lead">SiteGuard 已暫時擋下你要前往的網站：</p>
+    <p class="host" id="host">—</p>
+    <p class="category" id="category" hidden></p>
+
+    <section class="reasons">
+      <h2>判斷原因</h2>
+      <ul id="reasons"><li>檢查中…</li></ul>
+    </section>
+
+    <p class="tip">不要在這個網站輸入帳號密碼、信用卡或個人資料。如有疑問請撥打 <strong>165 反詐騙專線</strong>。</p>
+
+    <div class="actions">
+      <button id="back" class="primary">返回安全的頁面</button>
+    </div>
+
+    <details class="proceed">
+      <summary>我了解風險，仍要前往</summary>
+      <p>本次瀏覽期間將不再攔截這個網域。</p>
+      <button id="proceed" class="link">仍要前往 <span id="proceed-host"></span></button>
+    </details>
+  </main>
+  <script type="module" src="warning.js"></script>
+</body>
+</html>

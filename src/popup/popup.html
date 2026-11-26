@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>SiteGuard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <strong>SiteGuard</strong>
+    <span class="sub">網站安全檢查</span>
+  </header>
+
+  <section id="result" class="result" data-level="unknown">
+    <div class="status">
+      <span class="dot" aria-hidden="true"></span>
+      <div>
+        <div class="label" id="label">檢查中…</div>
+        <div class="host" id="host"></div>
+      </div>
+      <div class="score" id="score" title="風險分數 0–100"></div>
+    </div>
+    <span class="category" id="category" hidden></span>
+    <ul class="reasons" id="reasons"></ul>
+  </section>
+
+  <form id="check-form" class="check">
+    <label for="check-input">查詢其他網址</label>
+    <div class="row">
+      <input id="check-input" type="text" placeholder="貼上網址，例如 shopee-tw-sale.top" autocomplete="off" spellcheck="false">
+      <button type="submit">查詢</button>
+    </div>
+  </form>
+
+  <section class="report" id="report-section">
+    <div id="report-form">
+      <label for="report-category">覺得這個網站是詐騙？</label>
+      <div class="row">
+        <select id="report-category"></select>
+        <button id="report-btn" type="button" class="danger">回報</button>
+      </div>
+    </div>
+    <div id="reported" hidden>
+      <span>你已回報這個網站。</span>
+      <button id="unreport-btn" type="button" class="link">取消回報</button>
+    </div>
+    <p class="note">回報只會存在這台電腦，不會上傳。</p>
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

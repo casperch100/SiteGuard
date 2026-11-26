@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiteGuard 測試頁</title>
+  <style>
+    :root { --bg: #f8f9fa; --card: #fff; --text: #202124; --muted: #5f6368; --border: #dadce0; --link: #1a73e8; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #202124; --card: #2d2e31; --text: #e8eaed; --muted: #9aa0a6; --border: #3c4043; --link: #8ab4f8; } }
+    a { color: var(--link); }
+    body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+      font: 15px/1.7 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .lead { color: var(--muted); margin: 0 0 20px; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
+    h2 { font-size: 16px; margin: 0 0 8px; }
+    ul { margin: 0; padding-left: 20px; }
+    li { word-break: break-all; }
+    .hint { color: var(--muted); font-size: 13px; }
+    .chat { display: grid; gap: 8px; }
+    .bubble { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; max-width: 90%; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>SiteGuard 測試頁</h1>
+  <p class="lead">載入擴充功能後打開這頁：危險連結會加上紅框，可疑連結加上橘色虛線框；滑鼠移到連結上會顯示判斷原因。點擊危險連結會被導向警告頁。所有網址都是虛構的。</p>
+
+  <section>
+    <h2>✅ 正常網站（白名單）</h2>
+    <ul>
+      <li><a href="https://shopee.tw/">https://shopee.tw/</a></li>
+      <li><a href="https://www.cathaybk.com.tw/">https://www.cathaybk.com.tw/</a></li>
+      <li><a href="https://www.post.gov.tw/">https://www.post.gov.tw/</a></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>🚫 黑名單網站（模擬 165 資料）</h2>
+    <ul>
+      <li><a href="https://shopee-tw-sale.top/flash">https://shopee-tw-sale.top/flash</a> — 假購物</li>
+      <li><a href="https://gold-invest-vip.xyz/join">https://gold-invest-vip.xyz/join</a> — 假投資</li>
+      <li><a href="https://etag-fee-pay.top/pay">https://etag-fee-pay.top/pay</a> — 假冒繳費通知</li>
+      <li><a href="https://post-tw-parcel.icu/track">https://post-tw-parcel.icu/track</a> — 假冒郵局包裹</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>⚠️ 不在黑名單，但由規則判斷為危險或可疑</h2>
+    <ul>
+      <li><a href="https://paypa1.com/signin">https://paypa1.com/signin</a> — 形近字仿冒 + 新註冊網域</li>
+      <li><a href="https://line-login-secure.com/">https://line-login-secure.com/</a> — 含品牌名 + 可疑字詞 + 新網域</li>
+      <li><a href="https://esunbank-tw.online/">https://esunbank-tw.online/</a> — 仿冒銀行 + 可疑後綴</li>
+      <li><a href="https://shopee.top/">https://shopee.top/</a> — 同名不同網域</li>
+      <li><a href="http://203.0.113.45/bank/login">http://203.0.113.45/bank/login</a> — 直接用 IP</li>
+      <li><a href="https://www.cathaybk.com.tw@evil-site.example/">https://www.cathaybk.com.tw@evil-site.example/</a> — 「@」偽裝</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>💬 模擬聊天訊息</h2>
+    <p class="hint">模擬在 LINE、Messenger 網頁版收到的訊息，看連結會不會被標出來。</p>
+    <div class="chat">
+      <div class="bubble">【ETC通知】您的通行費尚未繳納，逾期將加收罰款，請盡快至 <a href="https://etag-fee-pay.top/pay">https://etag-fee-pay.top/pay</a> 完成繳費</div>
+      <div class="bubble">老師帶你操作，月報酬 30% 保證獲利！加入 <a href="https://stock-teacher-line.vip/group">https://stock-teacher-line.vip/group</a></div>
+      <div class="bubble">我們新開的咖啡店網站 <a href="https://new-coffee-shop.com/">https://new-coffee-shop.com/</a> 歡迎參考～（只有「新網域」一個訊號，不會誤判）</div>
+    </div>
+    <p class="hint"><button id="add">模擬收到新訊息</button>（測試動態載入的內容也會被掃描）</p>
+  </section>
+</main>
+<script>
+  document.getElementById('add').addEventListener('click', () => {
+    const div = document.createElement('div');
+    div.className = 'bubble';
+    div.innerHTML = '恭喜中獎！免費 iPhone 領取：<a href="https://free-iphone-gift.buzz/claim">https://free-iphone-gift.buzz/claim</a>';
+    document.querySelector('.chat').appendChild(div);
+  });
+</script>
+</body>
+</html>
