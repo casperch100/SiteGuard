@@ -38,7 +38,7 @@
     .ext b { position: absolute; right: -2px; bottom: -1px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; color: #fff; font-size: 11px; line-height: 15px; text-align: center; }
     .window > iframe { flex: 1; width: 100%; border: 0; background: #fff; }
     .window > iframe.popup {
-      position: absolute; top: 46px; right: 10px; width: 360px; height: 392px; border: 0; border-radius: 10px;
+      position: absolute; top: 46px; right: 10px; width: 360px; height: 470px; border: 0; border-radius: 10px;
       box-shadow: 0 8px 28px rgba(60, 64, 67, 0.35); background: #fff;
     }
     /* 小型宣傳圖塊 440×280 */
@@ -51,7 +51,16 @@
 </head>
 <body>
 <script type="module">
-  import { assessUrl } from '/src/lib/risk.js';
+  import { assessUrl as assessRaw } from '/src/lib/risk.js';
+  import { parseList } from '/src/lib/blocklist.js';
+
+  // 載入真正的 165 名單快照，讓截圖顯示和擴充功能一樣的結果
+  const [listText, listMeta] = await Promise.all([
+    fetch('/src/data/165-blocklist.txt').then((r) => r.text()),
+    fetch('/src/data/165-meta.json').then((r) => r.json()),
+  ]);
+  const blocklist = parseList(listText, listMeta);
+  const assessUrl = (u) => assessRaw(u, { blocklist });
 
   const scene = new URLSearchParams(location.search).get('scene') || '1';
   const ICON = '/icons/icon128.png';
@@ -62,24 +71,24 @@
       address: 'mail.example.com/inbox',
       badge: ['!', '#d93025'],
       frame: '/demo/index.html',
-      hover: '.chat a[href="https://etag-fee-pay.top/pay"]',
+      hover: '.chat a[href="https://myship-711-com-tw.cfd/"]',
       scrollTo: '.chat',
     },
     2: {
       title: '開到詐騙網站之前，<br>先幫你擋下來',
-      text: '已知的詐騙網站、明顯仿冒官方的網站，會在輸入任何資料前先顯示警告。',
-      address: 'etag-fee-pay.top/pay',
+      text: '內建 165 公告的 12 萬個涉詐網站，每週自動更新，在你輸入任何資料前先顯示警告。',
+      address: 'einvoiceoa.com',
       badge: ['!', '#d93025'],
-      frame: '/src/warning/warning.html?url=' + encodeURIComponent('https://etag-fee-pay.top/pay'),
+      frame: '/src/warning/warning.html?url=' + encodeURIComponent('https://einvoiceoa.com/'),
       module: '/src/warning/warning.js',
     },
     3: {
-      title: '點一下，<br>就知道網站安不安全',
-      text: '每個判斷都附上看得懂的原因：冒用品牌名稱、新註冊網域、可疑字詞⋯⋯',
-      address: 'line-login-secure.com',
+      title: '不在名單上的新網站，<br>也看得出破綻',
+      text: '冒用品牌名稱、可疑字詞、詐騙常用的網域後綴⋯⋯每個判斷都附上看得懂的原因。',
+      address: 'line-login-secure.top',
       badge: ['!', '#d93025'],
       frame: '/demo/index.html',
-      popup: 'https://line-login-secure.com/',
+      popup: 'https://line-login-secure.top/',
     },
   };
 
@@ -88,7 +97,7 @@
     document.body.insertAdjacentHTML('afterbegin', `
       <div class="copy">
         <div class="brand"><img src="${ICON}" alt="">SiteGuard</div>
-        <p>開網站前先幫你看一眼<br>辨識詐騙、仿冒與可疑網站</p>
+        <p>開網站前先幫你看一眼<br>內建 165 公告的涉詐網站名單</p>
       </div>`);
   } else {
     const s = SCENES[scene];
@@ -121,6 +130,9 @@
             }
             return out;
           }
+          if (m.type === 'listInfo') {
+            return { ok: true, dataMonth: listMeta.dataMonth, count: blocklist.hosts.size };
+          }
           return assessUrl(m.url);
         },
       },
@@ -151,7 +163,7 @@
       if (s.hover) {
         setTimeout(() => {
           win.document.querySelector(s.hover)?.dispatchEvent(new win.MouseEvent('mouseover', { bubbles: true }));
-        }, 1500);
+        }, 3000);
       }
     });
 

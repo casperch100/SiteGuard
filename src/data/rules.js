@@ -1,36 +1,7 @@
 // ============================================================
-// 模擬資料（尚未接上真實資料來源）
-// 黑名單與網域年齡皆為虛構範例，正式版應改為：
-//   - 165 反詐騙公開資料 / 自有情資，每日下載更新
-//   - RDAP 查詢真實網域註冊日期
+// 判斷規則用的靜態資料
+// 詐騙網站名單來自 165 公開資料，見 src/data/165-blocklist.txt 與 src/lib/blocklist.js
 // ============================================================
-
-/** 已知詐騙網站（模擬）。key 可以是可註冊網域或完整主機名稱。 */
-export const BLOCKLIST = {
-  'shopee-tw-sale.top': { category: '假購物', source: '模擬 165 資料' },
-  'momo-outlet-88.shop': { category: '假購物', source: '模擬 165 資料' },
-  'gold-invest-vip.xyz': { category: '假投資', source: '模擬 165 資料' },
-  'ai-quant-profit.cc': { category: '假投資', source: '模擬 165 資料' },
-  'stock-teacher-line.vip': { category: '假投資', source: '模擬 165 資料' },
-  'lucky-casino-tw.club': { category: '博弈', source: '模擬 165 資料' },
-  'cathaybk-verify.com': { category: '釣魚（假冒銀行）', source: '模擬使用者回報' },
-  'etag-fee-pay.top': { category: '釣魚（假冒繳費通知）', source: '模擬 165 資料' },
-  'post-tw-parcel.icu': { category: '釣魚（假冒郵局包裹）', source: '模擬 165 資料' },
-  'free-iphone-gift.buzz': { category: '假抽獎', source: '模擬使用者回報' },
-};
-
-/**
- * 模擬網域註冊天數（正式版改查 RDAP）。
- * 只能放「目前沒有人註冊」的虛構網域，避免對真實網域提供錯誤資訊
- * （例如 paypa1.com 是真實存在、由品牌保護服務代管的網域，所以不列入）。
- */
-export const DOMAIN_AGE_DAYS = {
-  'shopee-tw-sale.top': 3,
-  'gold-invest-vip.xyz': 12,
-  'line-login-secure.com': 6,
-  'esunbank-tw.online': 9,
-  'new-coffee-shop.com': 15,
-};
 
 /** 可信任網站（直接判定安全）。 */
 export const ALLOWLIST = new Set([
@@ -65,7 +36,7 @@ export const BRANDS = [
   { name: 'ASUS', keywords: ['asus'], official: ['asus.com'] },
 ];
 
-/** 詐騙網站常用的頂級網域。 */
+/** 詐騙網站常用的頂級網域（參考 165 資料中最常見的後綴）。 */
 export const SUSPICIOUS_TLDS = new Set([
   'top', 'xyz', 'icu', 'buzz', 'cyou', 'shop', 'vip', 'club', 'online', 'site', 'live', 'cc', 'rest', 'monster', 'sbs',
 ]);

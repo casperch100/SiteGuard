@@ -2,8 +2,9 @@
 // 網站風險判斷引擎（純函式，可在 Service Worker 與 Node 測試中共用）
 // ============================================================
 import {
-  BLOCKLIST, ALLOWLIST, TRUSTED_SUFFIXES, BRANDS, DOMAIN_AGE_DAYS, SUSPICIOUS_TLDS, SUSPICIOUS_WORDS,
-} from '../data/mock-data.js';
+  ALLOWLIST, TRUSTED_SUFFIXES, BRANDS, SUSPICIOUS_TLDS, SUSPICIOUS_WORDS,
+} from '../data/rules.js';
+import { lookupHost, SOURCE_NAME } from './blocklist.js';
 
 export const LEVELS = {
   safe: { label: '可信任網站', color: '#1e8e3e', badge: '✓' },
@@ -87,8 +88,14 @@ function isAllowlisted(t) {
   return TRUSTED_SUFFIXES.some((s) => t.host === s || t.host.endsWith('.' + s));
 }
 
-function lookupList(list, t) {
-  return list[t.host] || list[t.registrable] || null;
+function lookupReports(reports, t) {
+  return reports[t.host] || reports[t.registrable] || null;
+}
+
+/** 供建置腳本與更新程式共用：主機名稱是否在白名單（白名單上的網域不列入 165 名單） */
+export function isAllowedHost(host) {
+  const t = parseTarget(host);
+  return !!t && isAllowlisted(t);
 }
 
 /** 找出最像哪個品牌的仿冒網址（只取最強的一條理由）。 */
@@ -125,9 +132,10 @@ function brandSignal(t) {
 /**
  * 評估一個網址的風險。
  * @param {string} input 網址或網域
- * @param {{reports?: Record<string, {category: string}>}} [opts] 使用者本機回報
+ * @param {{reports?: Record<string, {category: string}>, blocklist?: {hosts: Map, meta: object}}} [opts]
+ *   reports：使用者本機回報；blocklist：165 涉詐網站名單（見 blocklist.js）
  */
-export function assessUrl(input, { reports = {} } = {}) {
+export function assessUrl(input, { reports = {}, blocklist = null } = {}) {
   const t = parseTarget(input);
   if (!t) return { ok: false, input, error: '不是有效的網址' };
 
@@ -136,17 +144,19 @@ export function assessUrl(input, { reports = {} } = {}) {
   const add = (weight, text) => reasons.push({ weight, text });
 
   // 1. 使用者自己回報過 → 危險
-  const reported = lookupList(reports, t);
+  const reported = lookupReports(reports, t);
   if (reported) {
     return { ...base, level: 'danger', score: 100, category: reported.category, reported: true,
       reasons: [{ weight: 100, text: `你曾回報此網站為「${reported.category}」` }] };
   }
 
-  // 2. 黑名單 → 危險
-  const blocked = lookupList(BLOCKLIST, t);
+  // 2. 165 涉詐網站名單 → 危險
+  const blocked = t.isIp ? null : lookupHost(blocklist, t.host, t.registrable);
   if (blocked) {
-    return { ...base, level: 'danger', score: 100, category: blocked.category,
-      reasons: [{ weight: 100, text: `已列入詐騙網站名單：${blocked.category}（來源：${blocked.source}）` }] };
+    const month = blocked.source === 'suspended' ? blocklist.meta?.dataMonth : null;
+    const src = `資料來源：${SOURCE_NAME}${month ? `，${month} 資料` : ''}`;
+    return { ...base, level: 'danger', score: 100, category: blocked.category, listed165: true,
+      reasons: [{ weight: 100, text: `已列入 165 反詐騙公告名單：${blocked.category}（${src}）` }] };
   }
 
   // 3. 白名單 → 安全
@@ -167,9 +177,6 @@ export function assessUrl(input, { reports = {} } = {}) {
       add(30, '網址含有「@」，實際前往的網站可能和看起來的不同');
     }
   }
-
-  const age = DOMAIN_AGE_DAYS[t.registrable];
-  if (age !== undefined && age < 30) add(age < 7 ? 35 : 30, `網域註冊僅 ${age} 天（模擬資料）`);
 
   const tld = t.host.split('.').pop();
   if (!t.isIp && SUSPICIOUS_TLDS.has(tld)) add(15, `使用詐騙網站常見的網域後綴「.${tld}」`);

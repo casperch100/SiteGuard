@@ -1,5 +1,5 @@
 import { LEVELS } from '../lib/risk.js';
-import { REPORT_CATEGORIES } from '../data/mock-data.js';
+import { REPORT_CATEGORIES } from '../data/rules.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -69,4 +69,12 @@ $('unreport-btn').addEventListener('click', async () => {
   show(currentUrl);
 });
 
+async function showListInfo() {
+  const info = await chrome.runtime.sendMessage({ type: 'listInfo' });
+  if (!info?.ok) return;
+  $('list-info').textContent =
+    `詐騙網站名單：165 公開資料 ${info.dataMonth ?? ''}，共 ${Number(info.count).toLocaleString('zh-TW')} 筆`;
+}
+
 resolveInitialUrl().then(show);
+showListInfo();

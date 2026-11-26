@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-26T12:28:47Z",
+  "dataMonth": "2026/10",
+  "count": 126212,
+  "categories": [
+    {
+      "label": "涉詐網站（金融保險）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（電子商務）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（假交友網站）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（抽獎博弈）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（釣魚網站）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（運輸倉儲）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（政府機構與國營事業）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（資訊服務）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（金融投資）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（虛擬通貨）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（假貸款網站）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（期貨）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（外匯）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（賣場商品）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（醫療保健）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（股票）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（電信業）",
+      "source": "suspended"
+    },
+    {
+      "label": "涉詐網站（醫療保險）",
+      "source": "suspended"
+    },
+    {
+      "label": "假投資（博弈）網站",
+      "source": "invest"
+    }
+  ],
+  "sources": {
+    "suspended": {
+      "title": "165反詐騙諮詢專線_遭停止解析涉詐網站",
+      "url": "https://data.gov.tw/dataset/176455",
+      "download": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/01EFB21E-DB91-4EDF-843F-F45923BBFA1D/download",
+      "rows": 104541,
+      "latest": "2026/10"
+    },
+    "invest": {
+      "title": "165反詐騙諮詢專線_假投資(博弈)網站",
+      "url": "https://data.gov.tw/dataset/160055",
+      "rows": 45258,
+      "latest": "2025/12/31"
+    }
+  },
+  "publisher": "內政部警政署",
+  "license": "政府資料開放授權條款第1版"
+}

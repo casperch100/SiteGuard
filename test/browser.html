@@ -21,6 +21,11 @@
     },
     assert: {
       equal(a, b, m) { if (a !== b) throw new Error(`${m ?? ''} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); },
+      ok(v, m) { if (!v) throw new Error(m ?? 'expected truthy'); },
+      throws(fn, re) {
+        try { fn(); } catch (e) { if (re && !re.test(e.message)) throw new Error(`error "${e.message}" does not match ${re}`); return; }
+        throw new Error('expected function to throw');
+      },
     },
   };
   // 把 node:test / node:assert 對應到上面的 shim 後執行同一份測試
@@ -28,7 +33,7 @@
   const patched = src
     .replace("import { test } from 'node:test';", 'const { test } = globalThis.__shim;')
     .replace("import assert from 'node:assert/strict';", 'const { assert } = globalThis.__shim;')
-    .replace("'../src/lib/risk.js'", `'${new URL('../src/lib/risk.js', location.href)}'`);
+    .replace(/'\.\.\/src\//g, `'${new URL('../src/', location.href)}`);
   await import(URL.createObjectURL(new Blob([patched], { type: 'text/javascript' })));
 
   const fails = results.filter(([ok]) => !ok).length;
@@ -37,14 +42,30 @@
   document.getElementById('out').innerHTML = results
     .map(([ok, n]) => `<span class="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'} ${n}</span>`).join('\n');
 
+  // 用真正的 165 名單快照跑一輪：抽樣網域應命中，白名單網站都不應出現在名單中
   const { assessUrl } = await import('../src/lib/risk.js');
-  const samples = ['https://shopee.top/', 'http://203.0.113.45/bank/login', 'https://www.cathaybk.com.tw@evil-site.example/',
-    'https://paypa1.com/signin', 'https://line-login-secure.com/', 'https://esunbank-tw.online/', 'https://new-coffee-shop.com/',
-    'https://stock-teacher-line.vip/group'];
-  document.getElementById('dump').textContent = samples.map((u) => {
-    const r = assessUrl(u);
-    return `${r.level.padEnd(10)} ${String(r.score).padStart(3)}  ${u}\n` + r.reasons.map((x) => `      - ${x.text} (${x.weight})`).join('\n');
-  }).join('\n');
+  const { parseList } = await import('../src/lib/blocklist.js');
+  const { ALLOWLIST } = await import('../src/data/rules.js');
+  const t0 = performance.now();
+  const [text, meta] = await Promise.all([
+    fetch('../src/data/165-blocklist.txt').then((r) => r.text()),
+    fetch('../src/data/165-meta.json').then((r) => r.json()),
+  ]);
+  const blocklist = parseList(text, meta);
+  const parseMs = Math.round(performance.now() - t0);
+  const allowHits = [...ALLOWLIST].filter((d) => assessUrl(d, { blocklist }).listed165);
+  const samples = ['https://myship-711-com-tw.cfd/', 'https://einvoiceoa.com/', 'https://www.ycoinit.com/',
+    'https://shopee.top/', 'https://paypa1.com/signin', 'https://line-login-secure.com/', 'https://new-coffee-shop.com/', 'https://shopee.tw/'];
+  const t1 = performance.now();
+  for (let i = 0; i < 1000; i++) assessUrl(samples[i % samples.length], { blocklist });
+  const perCheckUs = Math.round((performance.now() - t1) * 1000 / 1000);
+  document.getElementById('dump').textContent =
+    `snapshot: ${blocklist.hosts.size} hosts, data ${meta.dataMonth}, load+parse ${parseMs} ms, ~${perCheckUs} µs/check\n`
+    + `allowlist sites found in 165 list: ${allowHits.length ? allowHits.join(', ') : 'none'}\n\n`
+    + samples.map((u) => {
+      const r = assessUrl(u, { blocklist });
+      return `${r.level.padEnd(10)} ${String(r.score).padStart(3)}  ${u}\n` + r.reasons.map((x) => `      - ${x.text} (${x.weight})`).join('\n');
+    }).join('\n');
 </script>
 </body>
 </html>

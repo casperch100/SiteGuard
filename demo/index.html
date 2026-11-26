@@ -25,7 +25,8 @@
 <body>
 <main>
   <h1>SiteGuard 測試頁</h1>
-  <p class="lead">載入擴充功能後打開這頁：危險連結會加上紅框，可疑連結加上橘色虛線框；滑鼠移到連結上會顯示判斷原因。點擊危險連結會被導向警告頁。所有網址都是虛構的。</p>
+  <p class="lead">載入擴充功能後打開這頁：危險連結會加上紅框，可疑連結加上橘色虛線框；滑鼠移到連結上會顯示判斷原因。點擊危險連結會被導向警告頁。</p>
+  <p class="hint">「165 名單」區塊的網域取自內政部警政署公開的涉詐網站資料，而且都已遭停止解析，無法連到詐騙網站；「規則判斷」區塊的網址是虛構的。</p>
 
   <section>
     <h2>✅ 正常網站（白名單）</h2>
@@ -37,21 +38,22 @@
   </section>
 
   <section>
-    <h2>🚫 黑名單網站（模擬 165 資料）</h2>
+    <h2>🚫 165 公告的涉詐網站</h2>
     <ul>
-      <li><a href="https://shopee-tw-sale.top/flash">https://shopee-tw-sale.top/flash</a> — 假購物</li>
-      <li><a href="https://gold-invest-vip.xyz/join">https://gold-invest-vip.xyz/join</a> — 假投資</li>
-      <li><a href="https://etag-fee-pay.top/pay">https://etag-fee-pay.top/pay</a> — 假冒繳費通知</li>
-      <li><a href="https://post-tw-parcel.icu/track">https://post-tw-parcel.icu/track</a> — 假冒郵局包裹</li>
+      <li><a href="https://myship-711-com-tw.cfd/">https://myship-711-com-tw.cfd/</a> — 運輸倉儲（假冒超商物流）</li>
+      <li><a href="https://einvoiceoa.com/">https://einvoiceoa.com/</a> — 政府機構與國營事業（假冒電子發票）</li>
+      <li><a href="https://alupbuy.xyz/">https://alupbuy.xyz/</a> — 電子商務</li>
+      <li><a href="https://tw-rqq.shop/">https://tw-rqq.shop/</a> — 金融保險</li>
+      <li><a href="https://www.ycoinit.com/">https://www.ycoinit.com/</a> — 假投資（博弈）</li>
     </ul>
   </section>
 
   <section>
-    <h2>⚠️ 不在黑名單，但由規則判斷為危險或可疑</h2>
+    <h2>⚠️ 不在 165 名單，但由規則判斷為危險或可疑</h2>
     <ul>
       <li><a href="https://paypa1.com/signin">https://paypa1.com/signin</a> — 形近字仿冒（可疑）</li>
-      <li><a href="https://line-login-secure.com/">https://line-login-secure.com/</a> — 含品牌名 + 可疑字詞 + 新網域</li>
-      <li><a href="https://esunbank-tw.online/">https://esunbank-tw.online/</a> — 仿冒銀行 + 可疑後綴</li>
+      <li><a href="https://line-login-secure.top/">https://line-login-secure.top/</a> — 含品牌名 + 可疑字詞 + 可疑後綴</li>
+      <li><a href="https://esunbank-tw-verify-login.online/">https://esunbank-tw-verify-login.online/</a> — 仿冒銀行 + 可疑字詞 + 可疑後綴</li>
       <li><a href="https://shopee.top/">https://shopee.top/</a> — 同名不同網域</li>
       <li><a href="http://203.0.113.45/bank/login">http://203.0.113.45/bank/login</a> — 直接用 IP</li>
       <li><a href="https://www.cathaybk.com.tw@evil-site.example/">https://www.cathaybk.com.tw@evil-site.example/</a> — 「@」偽裝</li>
@@ -62,9 +64,9 @@
     <h2>💬 模擬聊天訊息</h2>
     <p class="hint">模擬在 LINE、Messenger 網頁版收到的訊息，看連結會不會被標出來。</p>
     <div class="chat">
-      <div class="bubble">【ETC通知】您的通行費尚未繳納，逾期將加收罰款，請盡快至 <a href="https://etag-fee-pay.top/pay">https://etag-fee-pay.top/pay</a> 完成繳費</div>
-      <div class="bubble">老師帶你操作，月報酬 30% 保證獲利！加入 <a href="https://stock-teacher-line.vip/group">https://stock-teacher-line.vip/group</a></div>
-      <div class="bubble">我們新開的咖啡店網站 <a href="https://new-coffee-shop.com/">https://new-coffee-shop.com/</a> 歡迎參考～（只有「新網域」一個訊號，不會誤判）</div>
+      <div class="bubble">【7-ELEVEN 賣貨便】您的包裹因地址不完整無法配送，請於 24 小時內至 <a href="https://myship-711-com-tw.cfd/">https://myship-711-com-tw.cfd/</a> 更新資料</div>
+      <div class="bubble">【電子發票】恭喜您的發票中獎，請至 <a href="https://einvoiceoa.com/">https://einvoiceoa.com/</a> 登錄領獎</div>
+      <div class="bubble">我們新開的咖啡店網站 <a href="https://new-coffee-shop.com/">https://new-coffee-shop.com/</a> 歡迎參考～（一般網站不會被誤判）</div>
     </div>
     <p class="hint"><button id="add">模擬收到新訊息</button>（測試動態載入的內容也會被掃描）</p>
   </section>
@@ -73,7 +75,7 @@
   document.getElementById('add').addEventListener('click', () => {
     const div = document.createElement('div');
     div.className = 'bubble';
-    div.innerHTML = '恭喜中獎！免費 iPhone 領取：<a href="https://free-iphone-gift.buzz/claim">https://free-iphone-gift.buzz/claim</a>';
+    div.innerHTML = '投資群組老師推薦的平台，穩賺不賠：<a href="https://tw-rqq.shop/">https://tw-rqq.shop/</a>';
     document.querySelector('.chat').appendChild(div);
   });
 </script>
