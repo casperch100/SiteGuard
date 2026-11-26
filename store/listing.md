@@ -72,8 +72,14 @@ SiteGuard 能降低受騙風險，但無法保證辨識所有詐騙網站。遇�
 | 小型宣傳圖塊 | 440×280 | `store/screenshots/promo-small.png` |
 
 ### 其他欄位
-- **官方網址／首頁網址**：選填，可以留空。
-- **支援網址**：選填，可以留空或填寫聯絡用的網頁。
+- **首頁網址（Homepage URL）**：
+  ```
+  https://github.com/casperch100/SiteGuard
+  ```
+- **支援網址（Support URL）**：
+  ```
+  https://github.com/casperch100/SiteGuard/issues
+  ```
 
 ---
 

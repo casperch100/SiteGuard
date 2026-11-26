@@ -18,12 +18,13 @@ test('黑名單網站判定為危險並帶分類', () => {
 });
 
 test('仿冒網址由規則判定為危險', () => {
-  for (const u of ['https://paypa1.com/signin', 'https://line-login-secure.com/', 'https://esunbank-tw.online/']) {
+  for (const u of ['https://line-login-secure.com/', 'https://esunbank-tw.online/']) {
     assert.equal(level(u), 'danger', u);
   }
 });
 
 test('可疑但未達危險', () => {
+  assert.equal(level('https://paypa1.com/signin'), 'suspicious');
   assert.equal(level('https://shopee.top/'), 'suspicious');
   assert.equal(level('http://203.0.113.45/bank/login'), 'suspicious');
   assert.equal(level('https://www.cathaybk.com.tw@evil-site.example/'), 'suspicious');

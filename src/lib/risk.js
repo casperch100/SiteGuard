@@ -15,7 +15,7 @@ export const LEVELS = {
 const DANGER_SCORE = 70;
 const SUSPICIOUS_SCORE = 35;
 
-// 常見的二層公眾後綴（POC 簡化版；正式版改用 Public Suffix List）
+// 常見的二層公眾後綴（簡化版；正式版改用 Public Suffix List）
 const MULTI_PART_SUFFIXES = new Set([
   'com.tw', 'net.tw', 'org.tw', 'gov.tw', 'edu.tw', 'idv.tw', 'co.uk', 'co.jp', 'com.cn', 'com.hk', 'com.sg', 'com.au',
 ]);

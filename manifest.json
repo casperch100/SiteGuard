@@ -27,7 +27,7 @@
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "matches": ["http://*/*", "https://*/*"],
       "js": ["src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_idle"

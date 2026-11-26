@@ -1,5 +1,5 @@
 // ============================================================
-// 模擬資料（POC 用）
+// 模擬資料（尚未接上真實資料來源）
 // 黑名單與網域年齡皆為虛構範例，正式版應改為：
 //   - 165 反詐騙公開資料 / 自有情資，每日下載更新
 //   - RDAP 查詢真實網域註冊日期
@@ -19,12 +19,15 @@ export const BLOCKLIST = {
   'free-iphone-gift.buzz': { category: '假抽獎', source: '模擬使用者回報' },
 };
 
-/** 模擬網域註冊天數（正式版改查 RDAP）。 */
+/**
+ * 模擬網域註冊天數（正式版改查 RDAP）。
+ * 只能放「目前沒有人註冊」的虛構網域，避免對真實網域提供錯誤資訊
+ * （例如 paypa1.com 是真實存在、由品牌保護服務代管的網域，所以不列入）。
+ */
 export const DOMAIN_AGE_DAYS = {
   'shopee-tw-sale.top': 3,
   'gold-invest-vip.xyz': 12,
   'line-login-secure.com': 6,
-  'paypa1.com': 21,
   'esunbank-tw.online': 9,
   'new-coffee-shop.com': 15,
 };
