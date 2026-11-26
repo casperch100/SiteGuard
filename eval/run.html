@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>SiteGuard 偵測評估</title>
+  <style>
+    body { margin: 16px; font: 13px/1.6 ui-monospace, Menlo, monospace; background: #fff; color: #202124; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<!--
+  沒有 Node.js 時的本機評估：用靜態伺服器開啟本頁（例如 ruby -run -e httpd . -p 8765），
+  或執行 ruby -Ku tools/eval/run_local.rb（會用無頭 Chrome 開啟本頁並寫出報告）。
+-->
+<pre id="report">評估中…</pre>
+<pre id="history" hidden></pre>
+<script type="module">
+  import { parseList } from '../src/lib/blocklist.js';
+  import { evaluate, parseCsv, toMarkdown, historyRow } from '../tools/eval/metrics.mjs';
+
+  const text = (p) => fetch(p, { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.text(); });
+  try {
+    const windowDays = Number(new URLSearchParams(location.search).get('window') || 28);
+    const [posText, negText, listText, metaText] = await Promise.all([
+      text('./data/positives.csv'), text('./cache/negatives.txt'),
+      text('../src/data/165-blocklist.txt'), text('../src/data/165-meta.json'),
+    ]);
+    const positives = parseCsv(posText);
+    const negatives = negText.split('\n').filter(Boolean);
+    const blocklist = parseList(listText, JSON.parse(metaText));
+    const results = [
+      evaluate({ positives, negatives, blocklist: null, windowDays }),
+      evaluate({ positives, negatives, blocklist, windowDays }),
+    ];
+    window.__evalOutput = { markdown: toMarkdown(results), history: historyRow(results) };
+    document.getElementById('report').textContent = window.__evalOutput.markdown;
+    document.getElementById('history').textContent = window.__evalOutput.history;
+  } catch (err) {
+    window.__evalOutput = { error: String(err) };
+    document.getElementById('report').textContent = '評估失敗：' + err;
+  }
+</script>
+</body>
+</html>

@@ -11,3 +11,6 @@ dist/
 
 # Node（若之後加入建置工具）
 node_modules/
+
+# 評估用的暫存資料（Tranco 排行等，每次重新下載，不重新散布）
+eval/cache/

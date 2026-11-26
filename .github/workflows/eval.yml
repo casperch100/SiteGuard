@@ -1,0 +1,67 @@
+# 每天收集仍在線的詐騙網域，並用偵測引擎跑一次離線評估。
+# 結果：eval/data/positives.csv（累積的評估資料）、eval/REPORT.md（最新報告）、eval/history.csv（每日趨勢）
+name: Daily detection evaluation
+
+on:
+  schedule:
+    - cron: '30 1 * * *'   # 每天 UTC 01:30（台灣 09:30）
+  workflow_dispatch:        # 也可以在 GitHub 的 Actions 頁面手動執行
+
+permissions:
+  contents: write           # 需要把評估資料提交回 repo
+
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Tranco 排行一週更新一次就夠，用快取避免每天重新下載
+      - name: Cache popular-site ranking
+        uses: actions/cache@v4
+        with:
+          path: eval/cache/tranco.zip
+          key: tranco-${{ github.run_id }}
+          restore-keys: tranco-
+
+      - name: Collect live scam domains (PhishTank)
+        run: ruby tools/eval/collect_positives.rb
+
+      # 165 資料每月更新；每月 1、15 日各收一次即可（手動執行時也會收）
+      - name: Collect new 165 domains
+        run: |
+          day=$(date -u +%d)
+          if [ "$day" = "01" ] || [ "$day" = "15" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ruby tools/eval/collect_positives.rb --165 download
+          fi
+
+      - name: Build legitimate-domain list (Tranco)
+        run: ruby tools/eval/build_negatives.rb
+
+      - name: Evaluate
+        run: node tools/eval/evaluate.mjs --window 28
+
+      - name: Commit results
+        run: |
+          git config user.name "siteguard-eval[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add eval/data/positives.csv eval/REPORT.md eval/history.csv
+          if git diff --cached --quiet; then
+            echo "沒有變更"
+          else
+            git commit -m "eval: daily detection evaluation $(date -u +%Y-%m-%d)"
+            git push
+          fi

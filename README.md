@@ -74,6 +74,18 @@ ruby -run -e httpd . -p 8765
 - 有 Node.js：`node --test test/`
 - 沒有 Node.js：先啟動上面的伺服器，再開啟 http://localhost:8765/test/browser.html（執行的是同一份 `test/risk.test.js`，並用真正的 165 快照測試載入速度與白名單是否被誤列）。
 
+## 偵測評估
+
+用和擴充功能同一份偵測引擎，離線計算「新詐騙網站偵測率」與「正常網站誤判率」。目標與進度見 [ROADMAP.md](ROADMAP.md)，最新結果見 [eval/REPORT.md](eval/REPORT.md)，每日趨勢見 `eval/history.csv`。
+
+GitHub Actions 每天自動執行（`.github/workflows/eval.yml`）。本機手動執行：
+
+```bash
+ruby -Ku tools/eval/collect_positives.rb     # 收集 PhishTank 仍在線的釣魚網域（加 --165 download 一併收集 165 新增網域）
+ruby -Ku tools/eval/build_negatives.rb       # 下載 Tranco 熱門網站排行，產生正常網域清單
+ruby -Ku tools/eval/run_local.rb             # 沒有 Node.js 時用無頭 Chrome 執行評估（有 Node.js 可改用 node tools/eval/evaluate.mjs）
+```
+
 ## 專案結構
 
 ```
@@ -92,6 +104,9 @@ test/                      引擎測試
 icons/                     擴充功能圖示（由 tools/make_icons.rb 產生）
 tools/update_165.rb        下載 165 公開資料並產生內建快照
 tools/pack.sh              打包上架用的 zip（輸出到 dist/）
+tools/eval/                評估工具：收集詐騙網域、產生正常網域清單、計算偵測率與誤判率
+eval/                      評估資料（data/positives.csv）、報告（REPORT.md）、每日趨勢（history.csv）
+ROADMAP.md                 發展計畫與決定
 store/                     上架資料：商店文案、隱私權政策、截圖、送審步驟
 index.html                 GitHub Pages 用的隱私權政策（和 store/privacy-policy.html 相同）
 ```
