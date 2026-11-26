@@ -19,15 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Third-party data
-
-The files src/data/165-blocklist.txt and src/data/165-meta.json are derived
-from open data published by the National Police Agency, Ministry of the
-Interior (Taiwan), 165 Anti-Fraud Consultation Hotline, and are used under the
-Open Government Data License, version 1.0 (政府資料開放授權條款第 1 版):
-https://data.gov.tw/license
-
-Those files are not covered by the MIT License above.

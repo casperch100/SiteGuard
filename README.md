@@ -90,5 +90,5 @@
 
 ## 資料來源與授權
 
-- 程式碼以 [MIT 授權條款](LICENSE) 釋出。
+- 程式碼以 [MIT 授權條款](LICENSE) 釋出（第三方資料的授權見 [NOTICE](NOTICE)）。
 - 詐騙網站名單來自**內政部警政署 165 反詐騙諮詢專線**的公開資料（[遭停止解析涉詐網站](https://data.gov.tw/dataset/176455)、[假投資(博弈)網站](https://data.gov.tw/dataset/160055)），依[政府資料開放授權條款第 1 版](https://data.gov.tw/license)使用，不適用 MIT 授權。

@@ -1,0 +1,15 @@
+SiteGuard
+Copyright (c) 2026 casperch100
+
+This product is licensed under the MIT License (see LICENSE), except for the
+third-party data described below.
+
+Third-party data
+
+The files src/data/165-blocklist.txt and src/data/165-meta.json are derived
+from open data published by the National Police Agency, Ministry of the
+Interior (Taiwan), 165 Anti-Fraud Consultation Hotline, and are used under the
+Open Government Data License, version 1.0 (政府資料開放授權條款第 1 版):
+https://data.gov.tw/license
+
+Those files are not covered by the MIT License above.
