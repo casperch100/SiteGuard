@@ -61,11 +61,15 @@ jobs:
         run: |-
           # 「@gemini-cli /review」後面的文字當作額外的審查重點
           context="${REQUEST#@gemini-cli /review}"
-          {
-            echo 'additional_context<<__EOF__'
-            echo "${context}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
-            echo '__EOF__'
-          } >> "${GITHUB_OUTPUT}"
+          trimmed="$(printf '%s' "${context}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          # 有額外重點才寫入（避免空字串被當成一行空白）
+          if [ -n "${trimmed}" ]; then
+            {
+              echo 'additional_context<<__EOF__'
+              printf '%s\n' "${trimmed}"
+              echo '__EOF__'
+            } >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: 'Acknowledge request'
         # 開 PR、推送時不回覆（審查報告本身就會出現）；只有留言要求重新審查時才回覆「收到」
@@ -86,7 +90,6 @@ jobs:
     uses: './.github/workflows/gemini-review.yml'
     permissions:
       contents: 'read'
-      id-token: 'write'
       issues: 'write'
       pull-requests: 'write'
     with:
