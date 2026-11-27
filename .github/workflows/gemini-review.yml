@@ -1,3 +1,13 @@
+# 用 Gemini 審查 Pull Request（由 gemini-dispatch.yml 呼叫）
+#
+# 和官方範例（google-github-actions/run-gemini-cli 的 examples/workflows/pr-review）不同的地方：
+#   - Gemini 只負責「寫審查報告」，可以唯讀地瀏覽 repo 裡的檔案，但不使用任何可以操作 GitHub 的工具；
+#     報告由本 workflow 貼到 PR 上。官方範例讓模型自己透過 GitHub 工具留言，
+#     實測模型會產生格式錯誤的工具呼叫（MALFORMED_FUNCTION_CALL），導致沒有留下任何審查。
+#   - 不安裝審查擴充功能，也就不受 Gemini CLI 0.70.0 起從 Git 安裝擴充功能失敗的問題影響
+#     （https://github.com/google-gemini/gemini-cli/issues/30416）。
+#   - 差異由本 workflow 計算，排除自動產生的大型資料檔。
+# 審查的語言與重點寫在 repo 根目錄的 GEMINI.md（Gemini CLI 會自動讀取）。
 name: '🔎 Gemini Review'
 
 on:
@@ -5,11 +15,11 @@ on:
     inputs:
       additional_context:
         type: 'string'
-        description: 'Any additional context from the request'
+        description: '留言中「@gemini-cli /review」後面的文字，作為額外的審查重點'
         required: false
 
 concurrency:
-  group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
+  group: '${{ github.workflow }}-review-${{ github.event.pull_request.number || github.event.issue.number }}'
   cancel-in-progress: true
 
 defaults:
@@ -19,150 +29,136 @@ defaults:
 jobs:
   review:
     runs-on: 'ubuntu-latest'
-    timeout-minutes: 7
+    timeout-minutes: 15
     permissions:
       contents: 'read'
-      id-token: 'write'
       issues: 'write'
       pull-requests: 'write'
+    env:
+      PR_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+      REPOSITORY: '${{ github.repository }}'
     steps:
-      - name: 'Mint identity token'
-        id: 'mint_identity_token'
-        if: |-
-          ${{ vars.APP_ID }}
-        uses: 'actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf' # ratchet:actions/create-github-app-token@v2
-        with:
-          app-id: '${{ vars.APP_ID }}'
-          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
-          permission-contents: 'read'
-          permission-issues: 'write'
-          permission-pull-requests: 'write'
-
-      - name: 'Checkout repository'
+      - name: 'Checkout pull request'
         uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8' # ratchet:actions/checkout@v6
         with:
+          ref: 'refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/head'
+          fetch-depth: 0
           persist-credentials: 'false'
 
-      - name: 'Prepare prompt context'
-        shell: 'bash'
-        run: |-
-          mkdir -p .gemini
-          jq -n \
-            --arg repo "${REPOSITORY}" \
-            --arg pr "${PULL_REQUEST_NUMBER}" \
-            --arg context "${ADDITIONAL_CONTEXT}" \
-            '{repository: $repo, pull_request_number: $pr, additional_context: $context}' > .gemini/context.json
-        env:
-          REPOSITORY: '${{ github.repository }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
-
-      - name: 'Record start time'
-        id: 'start'
-        run: |-
-          echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${GITHUB_OUTPUT}"
-
-      - name: 'Run Gemini pull request review'
-        uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
-        id: 'gemini_pr_review'
-        env:
-          GEMINI_CLI_TRUST_WORKSPACE: 'true'
-          GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-        with:
-          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          # 暫時固定在 0.68.0：0.70.0 起從 Git 網址安裝擴充功能會失敗（GIT_CONFIG_SYSTEM / allowUnsafeConfigPaths）
-          # https://github.com/google-gemini/gemini-cli/issues/30416 修好後可以移除，或用 repo 變數 GEMINI_CLI_VERSION 覆寫
-          gemini_cli_version: "${{ vars.GEMINI_CLI_VERSION || '0.68.0' }}"
-          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
-          gemini_model: '${{ vars.GEMINI_MODEL }}'
-          google_api_key: '${{ secrets.GOOGLE_API_KEY }}'
-          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
-          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
-          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
-          workflow_name: 'gemini-review'
-          # Explicitly set the PR number to handle `issue_comment` triggers (which GitHub treats as issues, not PRs)
-          github_pr_number: '${{ github.event.pull_request.number }}'
-          settings: |-
-            {
-              "model": {
-                "maxSessionTurns": 25
-              },
-              "telemetry": {
-                "enabled": true,
-                "target": "local",
-                "outfile": ".gemini/telemetry.log"
-              },
-              "mcpServers": {
-                "github": {
-                  "command": "docker",
-                  "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.27.0"
-                  ],
-                  "includeTools": [
-                    "add_comment_to_pending_review",
-                    "pull_request_read",
-                    "pull_request_review_write"
-                  ],
-                  "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-                  }
-                }
-              },
-              "tools": {
-                "core": []
-              }
-            }
-          extensions: |
-            [
-              "https://github.com/gemini-cli-extensions/code-review"
-            ]
-          prompt: '/pr-code-review'
-
-      # Gemini 有時執行成功卻沒有在 PR 上留下審查（例如留言用的工具失敗、或它判斷沒有問題）。
-      # 這時把它的輸出貼成留言，不必登入看執行紀錄也知道發生什麼事。
-      - name: 'Post Gemini output when no review was posted'
-        if: |-
-          ${{ always() && steps.gemini_pr_review.outcome != 'skipped' }}
+      - name: 'Prepare diff and settings'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          PR_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPOSITORY: '${{ github.repository }}'
-          STARTED_AT: '${{ steps.start.outputs.time }}'
-          OUTCOME: '${{ steps.gemini_pr_review.outcome }}'
-          SUMMARY: '${{ steps.gemini_pr_review.outputs.summary }}'
-          ERROR: '${{ steps.gemini_pr_review.outputs.error }}'
+          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
         run: |-
-          posted="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
-            --jq "[.[] | select(.submitted_at >= \"${STARTED_AT}\")] | length")"
-          if [ "${posted}" -gt 0 ]; then
-            echo "Gemini 已經留下 ${posted} 則審查，不需要補充。"
-            exit 0
-          fi
+          set -euo pipefail
+          base_ref="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json baseRefName --jq .baseRefName)"
+          title="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json title --jq .title)"
+          git fetch --no-tags origin "${base_ref}"
+          mkdir -p .gemini
+
+          # 排除自動產生的資料檔與圖片（不需要審查，也會塞爆上下文）
+          excludes=(
+            ':(exclude)src/data/165-blocklist.txt' ':(exclude)src/data/165-meta.json'
+            ':(exclude)src/data/rdap-bootstrap.json' ':(exclude)eval/data/**'
+            ':(exclude)eval/REPORT.md' ':(exclude)eval/history.csv'
+            ':(exclude)**/*.png' ':(exclude)**/*.jpg' ':(exclude)dist/**'
+          )
+          git diff --no-color "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > .gemini/pr.diff
+          git diff --stat "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > .gemini/pr.stat
+          echo "差異大小：$(wc -c < .gemini/pr.diff) bytes"
+          cat .gemini/pr.stat | tail -n 1
+
           {
-            echo "🤖 Gemini 執行完成（結果：${OUTCOME}），但沒有在 PR 上留下審查。以下是它的輸出："
+            echo "PR #${PR_NUMBER}：${title}"
+            echo "基準分支：${base_ref}"
             echo
-            echo '<details><summary>Gemini 輸出</summary>'
-            echo
-            echo '```'
-            printf '%s\n' "${SUMMARY:-（沒有輸出）}" | head -c 60000
-            echo '```'
-            if [ -n "${ERROR}" ]; then
+            echo "變更的檔案："
+            cat .gemini/pr.stat
+            if [ -n "${ADDITIONAL_CONTEXT}" ]; then
               echo
-              echo '錯誤訊息：'
-              echo '```'
-              printf '%s\n' "${ERROR}" | tail -c 6000
-              echo '```'
+              echo "這次請特別檢查：${ADDITIONAL_CONTEXT}"
             fi
-            echo '</details>'
-          } > "${RUNNER_TEMP}/gemini-output.md"
-          gh pr comment "${PR_NUMBER}" --repo "${REPOSITORY}" --body-file "${RUNNER_TEMP}/gemini-output.md"
+          } > .gemini/pr-info.txt
+
+          # 只開放唯讀工具：讀檔、列目錄、搜尋。沒有寫檔、執行指令或連網的工具。
+          cat > .gemini/settings.json <<'JSON'
+          {
+            "tools": {
+              "core": ["read_file", "read_many_files", "list_directory", "glob", "search_file_content"]
+            },
+            "telemetry": { "enabled": false }
+          }
+          JSON
+
+      - name: 'Run Gemini review'
+        id: 'gemini'
+        uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+        with:
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_cli_version: "${{ vars.GEMINI_CLI_VERSION || 'latest' }}"
+          gemini_model: '${{ vars.GEMINI_MODEL }}'
+          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || false) }}'
+          workflow_name: 'gemini-review'
+          prompt: |-
+            你是這個 repo 的程式碼審查者。請依照 GEMINI.md 的「審查重點」與「回饋格式」，審查這個 Pull Request。
+
+            - PR 資訊與變更的檔案列表：.gemini/pr-info.txt
+            - 完整差異（unified diff，已排除自動產生的資料檔）：.gemini/pr.diff
+
+            先讀這兩個檔案；需要更多上下文時，可以讀取 repo 中的其他檔案（工作目錄就是這個 PR 的程式碼）。
+            只審查這個 PR 的變更，以及變更直接影響到的程式。
+
+            請直接輸出審查報告（Markdown，繁體中文），格式如下，不要輸出其他內容：
+
+            ## 總結
+            一到三句話：這個 PR 做了什麼、整體評價、是否建議合併。
+
+            ## 發現的問題
+            依嚴重程度由高到低列出（Critical／High／Medium／Low）。每個問題包含：
+            嚴重程度、檔案與行號、問題說明（為什麼是問題）、具體修正建議。
+            沒有問題就寫「沒有發現需要修正的問題」。
+
+            ## 做得好的地方
+            簡短列出一到三點。
+
+      - name: 'Post review'
+        if: |-
+          ${{ always() && steps.gemini.outcome != 'skipped' }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          OUTCOME: '${{ steps.gemini.outcome }}'
+          SUMMARY: '${{ steps.gemini.outputs.summary }}'
+          ERROR: '${{ steps.gemini.outputs.error }}'
+          RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |-
+          set -euo pipefail
+          # summary 是 Gemini CLI 的 JSON 輸出（後面可能接著其他文字），取出第一個 JSON 物件的 response
+          python3 - <<'PY' > "${RUNNER_TEMP}/review.md"
+          import json, os
+          raw = os.environ.get("SUMMARY", "")
+          response, err = "", ""
+          start = raw.find("{")
+          if start != -1:
+              try:
+                  obj, _ = json.JSONDecoder().raw_decode(raw[start:])
+                  response = (obj.get("response") or "").strip()
+                  if obj.get("error"):
+                      err = json.dumps(obj["error"], ensure_ascii=False)
+              except ValueError:
+                  pass
+          if not response and raw and start == -1:
+              response = raw.strip()  # 不是 JSON 時，直接當成報告
+          if response:
+              print("## 🤖 Gemini 程式碼審查\n")
+              print(response)
+              print("\n---\n<sub>由 Gemini 自動產生，僅供參考，請自行判斷。重新審查：留言 <code>@gemini-cli /review</code>。</sub>")
+          else:
+              print("🤖 Gemini 這次沒有產生審查報告（結果：%s）。" % os.environ.get("OUTCOME"))
+              print("\n可以留言 `@gemini-cli /review` 再試一次，或查看[執行紀錄](%s)。" % os.environ.get("RUN_URL"))
+              detail = err or os.environ.get("ERROR", "")
+              if detail:
+                  print("\n<details><summary>錯誤訊息</summary>\n\n```\n%s\n```\n</details>" % detail[-6000:])
+          PY
+          gh pr comment "${PR_NUMBER}" --repo "${REPOSITORY}" --body-file "${RUNNER_TEMP}/review.md"
