@@ -70,6 +70,25 @@ export function lookupHost(list, host, registrable) {
   }
 }
 
+/** 切分一行 CSV：支援以雙引號包住、內含逗號或 "" 跳脫的欄位（RFC 4180） */
+export function splitCsvLine(line) {
+  const out = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quoted) {
+      if (c === '"' && line[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else field += c;
+    } else if (c === '"' && field === '') quoted = true;
+    else if (c === ',') { out.push(field); field = ''; }
+    else field += c;
+  }
+  out.push(field);
+  return out;
+}
+
 /** 民國年月（例如 11510）轉成「2026/10」 */
 export function rocMonthLabel(ym) {
   const m = /^(\d{2,3})(\d{2})$/.exec(String(ym ?? '').trim());
@@ -108,7 +127,7 @@ export function mergeSuspendedCsv(csv, base, isAllowed = () => false) {
   let latest = '';
   for (const line of lines) {
     if (!line) continue;
-    const f = line.split(',').map((s) => s.replace(/^"|"$/g, '').trim());
+    const f = splitCsvLine(line).map((s) => s.trim());
     const host = normalizeHost(f[iHost]);
     if (!host) continue;
     if (iMonth !== -1 && f[iMonth] > latest) latest = f[iMonth];

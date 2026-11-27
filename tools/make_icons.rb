@@ -1,6 +1,7 @@
 # 產生 SiteGuard 圖示（藍色盾牌 + 白色勾勾），只用 Ruby 標準函式庫。
 # 用法：ruby tools/make_icons.rb icons
 require 'zlib'
+require 'fileutils'
 
 def shield?(x, y)
   return false if y < 0.0 || y > 1.0 || x < 0.0 || x > 1.0
@@ -53,6 +54,7 @@ def render(size, pad)
 end
 
 out = ARGV[0] || 'icons'
+FileUtils.mkdir_p(out)
 # Chrome Web Store 規定 128px 圖示四周留 16px 透明邊（圖案 96px）
 { 16 => 0.03, 32 => 0.04, 48 => 0.06, 128 => 0.125 }.each do |size, pad|
   File.binwrite(File.join(out, "icon#{size}.png"), render(size, pad))

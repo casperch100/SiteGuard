@@ -15,13 +15,19 @@
 <!-- 沒有 Node.js 時的替代方案：用任何靜態伺服器開啟本頁，即可在瀏覽器執行 test/risk.test.js -->
 <script type="module">
   const results = [];
+  const pending = [];
   globalThis.__shim = {
+    // 支援同步與非同步（回傳 Promise）的測試
     test(name, fn) {
-      try { fn(); results.push([true, name]); } catch (e) { results.push([false, `${name} :: ${e.message}`]); }
+      pending.push(Promise.resolve().then(fn)
+        .then(() => results.push([true, name]), (e) => results.push([false, `${name} :: ${e.message}`])));
     },
     assert: {
       equal(a, b, m) { if (a !== b) throw new Error(`${m ?? ''} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`); },
       ok(v, m) { if (!v) throw new Error(m ?? 'expected truthy'); },
+      deepEqual(a, b, m) {
+        if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${m ?? ''} expected ${JSON.stringify(b)} got ${JSON.stringify(a)}`);
+      },
       throws(fn, re) {
         try { fn(); } catch (e) { if (re && !re.test(e.message)) throw new Error(`error "${e.message}" does not match ${re}`); return; }
         throw new Error('expected function to throw');
@@ -30,17 +36,27 @@
   };
   // 把 node:test / node:assert 對應到上面的 shim 後執行同一份測試
   const src = await (await fetch('./risk.test.js')).text();
+  // 單引號、雙引號都接受，避免程式碼格式化後替換失效
   const patched = src
-    .replace("import { test } from 'node:test';", 'const { test } = globalThis.__shim;')
-    .replace("import assert from 'node:assert/strict';", 'const { assert } = globalThis.__shim;')
-    .replace(/'\.\.\/src\//g, `'${new URL('../src/', location.href)}`);
-  await import(URL.createObjectURL(new Blob([patched], { type: 'text/javascript' })));
+    .replace(/import\s*\{\s*test\s*\}\s*from\s*['"]node:test['"];?/, 'const { test } = globalThis.__shim;')
+    .replace(/import\s+assert\s+from\s*['"]node:assert\/strict['"];?/, 'const { assert } = globalThis.__shim;')
+    .replace(/(['"])\.\.\/src\//g, `$1${new URL('../src/', location.href)}`);
+  const blobUrl = URL.createObjectURL(new Blob([patched], { type: 'text/javascript' }));
+  await import(blobUrl);
+  URL.revokeObjectURL(blobUrl);
+  await Promise.all(pending);
 
   const fails = results.filter(([ok]) => !ok).length;
   document.getElementById('summary').textContent = `${results.length - fails} passed, ${fails} failed`;
   document.getElementById('summary').className = fails ? 'fail' : 'pass';
-  document.getElementById('out').innerHTML = results
-    .map(([ok, n]) => `<span class="${ok ? 'pass' : 'fail'}">${ok ? 'PASS' : 'FAIL'} ${n}</span>`).join('\n');
+  // 用 textContent 建立節點，測試名稱或錯誤訊息裡的 < > 不會被當成 HTML
+  const out = document.getElementById('out');
+  out.replaceChildren(...results.flatMap(([ok, n], i) => {
+    const span = document.createElement('span');
+    span.className = ok ? 'pass' : 'fail';
+    span.textContent = `${ok ? 'PASS' : 'FAIL'} ${n}`;
+    return i ? [document.createTextNode('\n'), span] : [span];
+  }));
 
   // 用真正的 165 名單快照跑一輪：抽樣網域應命中，白名單網站都不應出現在名單中
   const { assessUrl } = await import('../src/lib/risk.js');

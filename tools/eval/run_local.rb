@@ -9,10 +9,15 @@ require 'socket'
 require 'tmpdir'
 require 'fileutils'
 
-HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample'
+HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample,detection_rules_live'
 
 ROOT = File.expand_path('../..', __dir__)
-CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+require 'cgi'
+# Chrome 執行檔：可用 CHROME_PATH 指定；預設依序找 macOS 的位置與 PATH 中的 google-chrome／chromium
+CHROME = ENV['CHROME_PATH'] ||
+         ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', 'google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']
+           .find { |c| c.start_with?('/') ? File.exist?(c) : system('command', '-v', c, out: File::NULL, err: File::NULL) } ||
+         abort('找不到 Chrome，請用 CHROME_PATH 指定執行檔路徑')
 window = (i = ARGV.index('--window')) ? ARGV[i + 1].to_i : 28
 port = TCPServer.open('127.0.0.1', 0) { |s| s.addr[1] }
 
@@ -28,12 +33,12 @@ begin
   dom = IO.popen([CHROME, '--headless=new', '--disable-gpu', "--user-data-dir=#{profile}", '--virtual-time-budget=60000',
                   '--dump-dom', url], err: File::NULL, &:read)
   pre = dom[%r{<pre id="report">(.*?)</pre>}m, 1].to_s
-  md = pre.gsub('&lt;', '<').gsub('&gt;', '>').gsub('&quot;', '"').gsub('&#39;', "'").gsub('&amp;', '&')
+  md = CGI.unescapeHTML(pre)
   raise "評估失敗：#{md[0, 300]}" if md.empty? || md.start_with?('評估中', '評估失敗')
 
   File.write(File.join(ROOT, 'eval/REPORT.md'), md)
 
-  row = dom[%r{<pre id="history"[^>]*>(.*?)</pre>}m, 1].to_s.strip
+  row = CGI.unescapeHTML(dom[%r{<pre id="history"[^>]*>(.*?)</pre>}m, 1].to_s).strip
   unless row.empty?
     hist = File.join(ROOT, 'eval/history.csv')
     lines = File.exist?(hist) ? File.readlines(hist, chomp: true).reject(&:empty?) : [HISTORY_HEADER]

@@ -6,14 +6,14 @@
 #
 # 輸出：src/data/rdap-bootstrap.json  { "generatedAt": ..., "tlds": { "com": "https://rdap.verisign.com/com/v1/", ... } }
 require 'json'
-require 'net/http'
 require 'uri'
+require_relative 'eval/common'
 
 ROOT = File.expand_path('..', __dir__)
 OUT = File.join(ROOT, 'src/data/rdap-bootstrap.json')
 SRC = 'https://data.iana.org/rdap/dns.json'
 
-data = JSON.parse(Net::HTTP.get(URI(SRC)))
+data = JSON.parse(EvalCommon.http_get(SRC))
 tlds = {}
 data['services'].each do |names, urls|
   url = urls.find { |u| u.start_with?('https://') } # 只用 HTTPS

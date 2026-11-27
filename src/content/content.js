@@ -57,6 +57,8 @@
       const host = linkHost(a);
       if (host && cache.has(host)) applyMark(a, cache.get(host));
     }
+    // 查詢期間新出現、而且網域剛好在查詢中的連結，這一輪沒有被標記；再掃一次（只會用快取，不會重複查詢）
+    if (document.querySelector('a[href]:not([data-sg-done])')) scheduleScan();
   }
 
   let scanTimer = null;

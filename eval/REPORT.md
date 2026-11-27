@@ -1,18 +1,20 @@
 # SiteGuard 偵測評估報告
 
-> 產生時間：2026-11-27 00:42 UTC　評估範圍：最近 28 天收集的詐騙網域
+> 產生時間：2026-11-27 05:45 UTC　評估範圍：最近 28 天收集的詐騙網域
 
 ## 是否達標
 
 | 指標 | 目標 | 只用規則 | 加上 165 名單 |
 |---|---|---|---|
-| 偵測率（可疑＋危險） | ≥ 50.0% | 23.6% ❌ | 53.1% ✅ |
-| 其中判為「危險」 | — | 0.2% | 0.0% |
+| 偵測率（可疑＋危險） | ≥ 50.0% | 53.1% ✅ | 53.1% ✅ |
+| 其中判為「危險」 | — | 0.0% | 0.0% |
 | 誤判率（正常網站被判可疑或危險） | ≤ 1.0% | 1.7% ❌ | 1.7% ❌ |
-| 誤判率（只看查得到註冊日期的 732 個正常網站） | ≤ 1.0% | 1.6% ❌ | 1.6% ❌ |
-| 樣本數 | — | 詐騙 3037／正常 11986 | 詐騙 550／正常 11986 |
+| 誤判率（只看查得到註冊日期的 739 個正常網站） | ≤ 1.0% | 1.2% ❌ | 1.2% ❌ |
+| 樣本數 | — | 詐騙 550／正常 11986 | 詐騙 550／正常 11986 |
 
-「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。「加上 165 名單」不計入來源是 165 的樣本（它們本來就在名單中）。
+兩欄使用**同一批**樣本：收集時仍在線的詐騙網域（PhishTank 等），不含 165 樣本。「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。
+
+參考：165 樣本 2487 個（多半在公布時已被刪除、查不到註冊日期），只用規則的偵測率 17.1%；它們本來就在 165 名單中，所以不列入上表比較。
 
 ## 最近的資料收集
 
@@ -60,7 +62,7 @@
 - `dragonflyshipctms-nl.eu.cc`
 - `ephemeral-gingersnap-739019.netlify.app`
 
-## 被誤判的正常網站（共 206 個，列出前 30 個）
+## 被誤判的正常網站（共 207 個，列出前 30 個）
 
 - hicloudcam.com（suspicious 40：網址含有「icloud」字樣，但不是「Apple」的官方網站）
 - googlevideo.com（suspicious 40：網址含有「google」字樣，但不是「Google」的官方網站）
@@ -85,13 +87,13 @@
 - google.de（suspicious 45：網域名稱和「Google」官方網站（google.com）相同，但網域後綴不同）
 - google.com.hk（suspicious 45：網域名稱和「Google」官方網站（google.com）相同，但網域後綴不同）
 - hicloud.com（suspicious 50：網址「hicloud.com」和「Apple」官方網站（icloud.com）只差 1 個字）
-- shopee.com.br（suspicious 40：網址含有「shopee」字樣，但不是「蝦皮購物」的官方網站）
+- shopee.com.br（suspicious 45：網域名稱和「蝦皮購物」官方網站（shopee.tw）相同，但網域後綴不同）
 - shopeemobile.com（suspicious 40：網址含有「shopee」字樣，但不是「蝦皮購物」的官方網站）
 - googlezip.net（suspicious 40：網址含有「google」字樣，但不是「Google」的官方網站）
 - shopee.co.id（suspicious 40：網址含有「shopee」字樣，但不是「蝦皮購物」的官方網站）
 - safebrowsing.apple（suspicious 40：網址含有「apple」字樣，但不是「Apple」的官方網站）
 - google.co.uk（suspicious 45：網域名稱和「Google」官方網站（google.com）相同，但網域後綴不同）
-- google.com.br（suspicious 40：網址含有「google」字樣，但不是「Google」的官方網站）
+- google.com.br（suspicious 45：網域名稱和「Google」官方網站（google.com）相同，但網域後綴不同）
 
 ---
 資料來源：[PhishTank](https://phishtank.org/)（Cisco Talos）、內政部警政署 165 反詐騙諮詢專線、[Tranco](https://tranco-list.eu/) 熱門網站排行。

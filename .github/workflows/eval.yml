@@ -76,5 +76,13 @@ jobs:
             echo "沒有變更"
           else
             git commit -m "eval: daily detection evaluation $(date -u +%Y-%m-%d)"
-            git push
+            # 評估期間 main 可能有新的 commit：先 rebase 再推送，最多重試 3 次
+            for attempt in 1 2 3; do
+              if git pull --rebase origin main && git push; then
+                exit 0
+              fi
+              echo "推送失敗，第 ${attempt} 次重試"; sleep $((attempt * 5))
+            done
+            echo "::error::三次推送都失敗，今天的評估結果沒有存進 repo"
+            exit 1
           fi
