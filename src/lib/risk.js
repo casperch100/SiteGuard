@@ -245,7 +245,10 @@ function brandSignal(t) {
   return best;
 }
 
-/** 網域年齡規則的分數（第 5 步依評估結果調整） */
+/** 剛註冊＋詐騙常見後綴的加分（和年齡 40、後綴 15 相加後剛好達到「危險」門檻 70） */
+export const NEW_AND_SUSPICIOUS_TLD = { maxDays: 30, weight: 15 };
+
+/** 網域年齡規則的分數 */
 export const AGE_RULES = [
   { maxDays: 30, weight: 40, text: (d) => `網域註冊僅 ${d} 天` },
   { maxDays: 90, weight: 30, text: (d) => `網域註冊未滿 3 個月（${d} 天）` },
@@ -332,7 +335,13 @@ export function assessUrl(input, { reports = {}, blocklist = null, domainAgeDays
   }
 
   const tld = t.host.split('.').pop();
-  if (!t.isIp && SUSPICIOUS_TLDS.has(tld)) add(15, `使用詐騙網站常見的網域後綴「.${tld}」`);
+  const suspiciousTld = !t.isIp && SUSPICIOUS_TLDS.has(tld);
+  if (suspiciousTld) add(15, `使用詐騙網站常見的網域後綴「.${tld}」`);
+  // 兩個獨立的訊號同時出現才升為「危險」：剛註冊（30 天內）＋詐騙常見後綴。
+  // 評估中約四分之一的新詐騙網站符合（ROADMAP 第 5 步）；只有其中一項時維持「可疑」，降低誤擋新開正常網站的機會。
+  if (suspiciousTld && typeof age === 'number' && age <= NEW_AND_SUSPICIOUS_TLD.maxDays) {
+    add(NEW_AND_SUSPICIOUS_TLD.weight, '剛註冊的網域又使用詐騙常見的網域後綴，兩者同時出現的正常網站很少');
+  }
 
   const words = SUSPICIOUS_WORDS.filter((w) => t.host.includes(w));
   if (words.length) add(Math.min(20, words.length * 10), `網址含有可疑字詞：${words.join('、')}`);

@@ -110,7 +110,7 @@ test('網域年齡：新註冊網域加分，舊網域不加分', () => {
   const r = assessUrl('https://tuoho.shop/', { domainAgeDays: age(12) });
   assert.equal(r.ageDays, 12);
   assert.ok(r.reasons.some((x) => x.text.includes('12 天')), JSON.stringify(r.reasons));
-  assert.equal(r.level, 'suspicious'); // 40（30 天內）+ 15（可疑後綴）
+  assert.equal(r.level, 'danger'); // 40（30 天內）+ 15（可疑後綴）+ 15（兩者同時出現）
   assert.equal(assessUrl('https://tuoho.shop/', { domainAgeDays: age(60) }).score, 45);
   assert.equal(assessUrl('https://tuoho.shop/', { domainAgeDays: age(400) }).score, 15);
   assert.equal(assessUrl('https://tuoho.shop/', { domainAgeDays: () => null }).score, 15);
@@ -227,4 +227,13 @@ test('國際化網域：拉丁字母混用相似字元才加重分數', () => {
   assert.equal(level('https://xn--cksr0a.tw/'), 'unknown');
   assert.equal(idnInfo('xn--ngstr-lra8j.com').kind, 'native');       // ångström：重音字母不算混用
   assert.equal(level('https://xn--80ak6aa92e.com/'), 'danger');       // 看起來是 apple.com
+});
+
+test('剛註冊＋詐騙常見後綴才升為危險', () => {
+  const at = (days) => ({ domainAgeDays: () => days });
+  assert.equal(level('https://brand-new-shop.top/', at(5)), 'danger');      // 40 + 15 + 15
+  assert.equal(level('https://brand-new-shop.top/', at(29)), 'danger');
+  assert.equal(level('https://brand-new-shop.top/', at(45)), 'suspicious');  // 超過 30 天
+  assert.equal(level('https://brand-new-shop.com/', at(5)), 'suspicious');   // 只有剛註冊
+  assert.equal(level('https://old-shop.top/', at(2000)), 'unknown');         // 只有後綴
 });
