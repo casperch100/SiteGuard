@@ -56,6 +56,8 @@ jobs:
           title="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json title --jq .title)"
           git fetch --no-tags origin "+refs/heads/${base_ref}:refs/remotes/origin/${base_ref}"
           # 審查用的輸入放在 pr-review/：Gemini CLI 不會讀取 .gitignore 裡的路徑（.gemini/ 被忽略）
+          # 先刪除 PR 分支裡可能帶來的 .gemini/（自訂指令、擴充功能等），只留下本 workflow 寫的設定
+          rm -rf .gemini pr-review
           mkdir -p .gemini pr-review
 
           # 排除自動產生的資料檔與圖片（不需要審查，也會塞爆上下文）
@@ -178,7 +180,8 @@ jobs:
           prompt: '${{ steps.prep.outputs.prompt }}'
 
       - name: 'Post review'
-        if: '${{ always() }}'
+        # 被新的推送取消時不留言（!cancelled() 而不是 always()）
+        if: '${{ !cancelled() }}'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           OUTCOME: '${{ steps.gemini.outcome }}'
