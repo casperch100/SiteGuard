@@ -46,6 +46,6 @@ ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh to
 6. **送審**：按「提交審查」。因為要求在所有網站上運作（`<all_urls>`），審查可能較久，通常需要幾天到幾週。
 
 ## 之後更新版本
-1. 修改 `manifest.json` 的 `version`（例如 `0.3.0` → `0.3.1`）。
+1. 修改 `manifest.json` 的 `version`（例如 `0.4.0` → `0.4.1`）。
 2. 執行 `ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh tools/pack.sh`，更新 165 名單與 RDAP 對照表，並產生新的 zip。
 3. 在開發人員資訊主頁的「套件」頁上傳新 zip，再提交審查。
