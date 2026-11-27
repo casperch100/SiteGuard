@@ -29,7 +29,7 @@ defaults:
 jobs:
   review:
     runs-on: 'ubuntu-latest'
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: 'read'
       issues: 'write'
@@ -54,7 +54,8 @@ jobs:
           base_ref="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json baseRefName --jq .baseRefName)"
           title="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json title --jq .title)"
           git fetch --no-tags origin "${base_ref}"
-          mkdir -p .gemini
+          # 審查用的輸入放在 pr-review/：Gemini CLI 不會讀取 .gitignore 裡的路徑（.gemini/ 被忽略）
+          mkdir -p .gemini pr-review
 
           # 排除自動產生的資料檔與圖片（不需要審查，也會塞爆上下文）
           excludes=(
@@ -63,22 +64,22 @@ jobs:
             ':(exclude)eval/REPORT.md' ':(exclude)eval/history.csv'
             ':(exclude)**/*.png' ':(exclude)**/*.jpg' ':(exclude)dist/**'
           )
-          git diff --no-color "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > .gemini/pr.diff
-          git diff --stat "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > .gemini/pr.stat
-          echo "差異大小：$(wc -c < .gemini/pr.diff) bytes"
-          cat .gemini/pr.stat | tail -n 1
+          git diff --no-color "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > pr-review/pr.diff
+          git diff --stat "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > pr-review/pr.stat
+          echo "差異大小：$(wc -c < pr-review/pr.diff) bytes"
+          cat pr-review/pr.stat | tail -n 1
 
           {
             echo "PR #${PR_NUMBER}：${title}"
             echo "基準分支：${base_ref}"
             echo
             echo "變更的檔案："
-            cat .gemini/pr.stat
+            cat pr-review/pr.stat
             if [ -n "${ADDITIONAL_CONTEXT}" ]; then
               echo
               echo "這次請特別檢查：${ADDITIONAL_CONTEXT}"
             fi
-          } > .gemini/pr-info.txt
+          } > pr-review/pr-info.txt
 
           # 只開放唯讀工具：讀檔、列目錄、搜尋。沒有寫檔、執行指令或連網的工具。
           cat > .gemini/settings.json <<'JSON'
@@ -86,6 +87,7 @@ jobs:
             "tools": {
               "core": ["read_file", "read_many_files", "list_directory", "glob", "search_file_content"]
             },
+            "model": { "maxSessionTurns": 30 },
             "telemetry": { "enabled": false }
           }
           JSON
@@ -104,11 +106,12 @@ jobs:
           prompt: |-
             你是這個 repo 的程式碼審查者。請依照 GEMINI.md 的「審查重點」與「回饋格式」，審查這個 Pull Request。
 
-            - PR 資訊與變更的檔案列表：.gemini/pr-info.txt
-            - 完整差異（unified diff，已排除自動產生的資料檔）：.gemini/pr.diff
+            - PR 資訊與變更的檔案列表：pr-review/pr-info.txt
+            - 完整差異（unified diff，已排除自動產生的資料檔）：pr-review/pr.diff
 
             先讀這兩個檔案；需要更多上下文時，可以讀取 repo 中的其他檔案（工作目錄就是這個 PR 的程式碼）。
             只審查這個 PR 的變更，以及變更直接影響到的程式。
+            如果讀不到 pr-review/ 裡的檔案，不要嘗試其他路徑，直接輸出「無法讀取審查資料」以及錯誤原因後結束。
 
             請直接輸出審查報告（Markdown，繁體中文），格式如下，不要輸出其他內容：
 
