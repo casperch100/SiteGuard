@@ -31,7 +31,7 @@
 | 和官方網站同名但後綴不同（`shopee.top`） | 45 |
 | 用「@」偽裝成另一個網域（`www.bank.com@evil.com`）／其他「@」偽裝 | 45／30 |
 | 網址含有品牌名稱，但不是官方網站（`line-login-xxx.com`） | 40 |
-| Punycode（國際化字元）網域 | 40 |
+| Punycode 網域混用拉丁字母和希臘、西里爾字母（例如用西里爾字母 а 拼成的 paypal）；換回拉丁字母後是品牌網站時另加品牌分數 | 40 |
 | 直接使用 IP 位址，而不是網域名稱 | 30 |
 | 詐騙網站常用的網域後綴（`.top`、`.xyz`、`.vip` 等） | 15 |
 | 可疑字詞（login、verify、invest 等） | 每個 10，最多 20 |
@@ -106,6 +106,8 @@ ruby -Ku tools/eval/run_local.rb             # 沒有 Node.js 時用無頭 Chrom
 | [PhishTank](https://phishtank.org/)（Cisco Talos） | 仍在線的釣魚網域 | 商業與非商業用途皆可 |
 | 165 遭停止解析涉詐網站 | 台灣在地樣本 | 政府資料開放授權條款第 1 版 |
 | [Tranco](https://tranco-list.eu/) | 正常網域 | 部分來源為 CC BY-NC／CC BY-SA，只在評估時下載，不放進 repo |
+
+正常網域分成兩組：`eval/cache/negatives.txt`（全球前 1 萬＋ `.tw` 前 2,000）用來找誤判、調整規則；`eval/cache/negatives_holdout.txt`（保留組，全球第 10,001–30,000 名＋ `.tw` 第 2,001–4,000 名）只看誤判率，**調整規則時不要看保留組被誤判的網域**，否則它就無法代表「沒看過的網站」。
 
 ## 打包上架
 
