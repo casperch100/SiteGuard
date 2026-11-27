@@ -12,6 +12,7 @@ module EvalCommon
   module_function
 
   # 常見的二層公眾後綴（和 src/lib/risk.js 的 MULTI_PART_SUFFIXES 一致，再補幾個常見的）
+  # 和 src/lib/risk.js 的 MULTI_PART_SUFFIXES 保持一致
   MULTI_PART_SUFFIXES = %w[com.tw net.tw org.tw gov.tw edu.tw idv.tw co.uk co.jp com.cn com.hk com.sg com.au com.br co.in co.kr].freeze
 
   # 任何人都能申請子網域的共用平台：子網域是詐騙網站，不代表平台本身是。

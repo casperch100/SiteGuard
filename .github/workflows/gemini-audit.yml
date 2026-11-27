@@ -90,7 +90,7 @@ jobs:
           code = open("audit-input/code.txt", encoding="utf-8", errors="replace").read()
           guidelines = open("audit-input/guidelines.md", encoding="utf-8").read().strip()
           files = open("audit-input/files.txt", encoding="utf-8").read().split()
-          PROMPT_LIMIT = 120_000  # 提示以命令列參數傳入，單一參數上限約 128 KB
+          PROMPT_LIMIT = 110_000  # 提示以命令列參數傳入，單一參數上限約 128 KB，保留緩衝
           head = [
               "你是這個 repo 的程式碼審查者。這不是審查某個 PR，而是**對目前的程式碼做一次整體審查**：%s。" % os.environ["LABEL"],
               "請依照下方「審查指引」的審查重點與回饋格式進行。",

@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { parseList } from '../../src/lib/blocklist.js';
-import { evaluate, parseCsv, toMarkdown, historyRow, HISTORY_HEADER } from './metrics.mjs';
+import { evaluateAll, parseCsv, toMarkdown, historyRow, HISTORY_HEADER } from './metrics.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -26,10 +26,7 @@ const windowDays = Number(arg('--window', 28));
 const agesPath = join(ROOT, 'eval/cache/negatives_age.json');
 const negativeAges = existsSync(agesPath) ? JSON.parse(readFileSync(agesPath, 'utf8')) : null;
 
-const results = [
-  evaluate({ positives, negatives, blocklist: null, windowDays, negativeAges }),
-  evaluate({ positives, negatives, blocklist, windowDays, negativeAges }),
-];
+const results = evaluateAll({ positives, negatives, blocklist, windowDays, negativeAges });
 
 const logPath = join(ROOT, 'eval/data/collect-log.csv');
 const collectLog = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';

@@ -31,9 +31,25 @@ $('back').addEventListener('click', async () => {
   }
 });
 
+/** 只允許前往 http(s) 網址（避免 javascript: 等網址在擴充功能頁面中執行） */
+function safeTarget(raw) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 $('proceed').addEventListener('click', async () => {
-  await chrome.runtime.sendMessage({ type: 'bypass', url });
-  location.href = url;
+  const target = safeTarget(url);
+  if (!target) {
+    $('proceed').disabled = true;
+    $('proceed').textContent = '這不是可以前往的網址';
+    return;
+  }
+  await chrome.runtime.sendMessage({ type: 'bypass', url: target });
+  location.href = target;
 });
 
 init();

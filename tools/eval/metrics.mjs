@@ -56,11 +56,10 @@ function ageDays(row, now) {
  * @param {number} [p.windowDays]  只評估最近幾天收集的詐騙網域
  * @param {Date} [p.now]
  */
-export function evaluate({ positives, negatives, blocklist = null, windowDays = 28, now = new Date(), negativeAges = null }) {
+export function evaluate({ positives, negatives, blocklist = null, windowDays = 28, now = new Date(), negativeAges = null, excludeSources = [] }) {
   const since = new Date(now.getTime() - windowDays * 86400000);
-  // 使用 165 名單時，排除來源就是 165 的樣本：它們本來就在名單裡，算進去會高估（循環論證）
   const pos = positives.filter((r) => (!r.collected_at || new Date(r.collected_at) >= since)
-    && !(blocklist && r.source === '165'));
+    && !excludeSources.includes(r.source));
 
   // 收集當下查到的註冊日期，提供給引擎（第 3 步加入網域年齡規則後才會用到）
   const ageByReg = new Map();
@@ -137,6 +136,21 @@ function count(arr) {
   return m;
 }
 
+/**
+ * 跑報告需要的三次評估：
+ *   rulesAll：所有樣本、只用規則（細項分組用）
+ *   rulesLive／listLive：只用「收集時仍在線」的樣本（排除 165），分別只用規則、加上 165 名單。
+ *   兩者樣本完全相同才能比較；165 樣本本來就在 165 名單裡，放進「加上 165 名單」會變成循環論證。
+ */
+export function evaluateAll({ positives, negatives, blocklist, windowDays, negativeAges }) {
+  const base = { positives, negatives, windowDays, negativeAges };
+  return [
+    evaluate({ ...base, blocklist: null }),
+    evaluate({ ...base, blocklist: null, excludeSources: ['165'] }),
+    evaluate({ ...base, blocklist, excludeSources: ['165'] }),
+  ];
+}
+
 /** 產生 Markdown 報告 */
 /** 最近的收集紀錄（eval/data/collect-log.csv）轉成報告段落 */
 export function collectLogSection(logText, maxRows = 10) {
@@ -158,29 +172,31 @@ export function collectLogSection(logText, maxRows = 10) {
   for (const r of recent) {
     const ok = r.status === 'ok' ? '✅ 成功' : '❌ 失敗';
     const env = r.runner === 'github-actions' ? 'GitHub Actions' : '本機';
-    lines.push(`| ${r.run_at.replace('T', ' ').slice(0, 16)} | ${env} | ${r.source} | ${ok} | ${r.downloaded} | ${r.fresh} | ${r.new_domains} | ${r.rdap_ok} | ${(r.note || '').replace(/\|/g, '／')} |`);
+    lines.push(`| ${r.run_at.replace('T', ' ').slice(0, 16)} | ${env} | ${r.source} | ${ok} | ${r.downloaded} | ${r.fresh} | ${r.new_domains} | ${r.rdap_ok} | ${(r.note || '').replace(/\|/g, '／').replace(/[\r\n]+/g, ' ')} |`);
   }
   lines.push('', '「近期通報」：PhishTank 是最近 72 小時內通報、已驗證且仍在線的網址數；165 是最新月份新增的網域數。「新增網域」不含之前已收集過的。', '');
   return lines;
 }
 
 export function toMarkdown(results, { collectLog = '' } = {}) {
-  const [main, ...others] = results;
+  const [main, live = main, withList = live] = results; // main：全部樣本；live／withList：同一批仍在線樣本
   const ok = (v, t, lower) => (lower ? v <= t : v >= t) ? '✅' : '❌';
   const lines = [];
   lines.push('# SiteGuard 偵測評估報告', '');
   lines.push(`> 產生時間：${main.generatedAt.replace('T', ' ').slice(0, 16)} UTC　評估範圍：最近 ${main.windowDays} 天收集的詐騙網域`, '');
   lines.push('## 是否達標', '');
   lines.push('| 指標 | 目標 | 只用規則 | 加上 165 名單 |', '|---|---|---|---|');
-  const withList = others[0] ?? main;
-  lines.push(`| 偵測率（可疑＋危險） | ≥ ${pct(TARGET.detection)} | ${pct(main.detection.rate)} ${ok(main.detection.rate, TARGET.detection)} | ${pct(withList.detection.rate)} ${ok(withList.detection.rate, TARGET.detection)} |`);
-  lines.push(`| 其中判為「危險」 | — | ${pct(main.detection.dangerRate)} | ${pct(withList.detection.dangerRate)} |`);
+  lines.push(`| 偵測率（可疑＋危險） | ≥ ${pct(TARGET.detection)} | ${pct(live.detection.rate)} ${ok(live.detection.rate, TARGET.detection)} | ${pct(withList.detection.rate)} ${ok(withList.detection.rate, TARGET.detection)} |`);
+  lines.push(`| 其中判為「危險」 | — | ${pct(live.detection.dangerRate)} | ${pct(withList.detection.dangerRate)} |`);
   lines.push(`| 誤判率（正常網站被判可疑或危險） | ≤ ${pct(TARGET.falsePositive)} | ${pct(main.falsePositive.rate)} ${ok(main.falsePositive.rate, TARGET.falsePositive, true)} | ${pct(withList.falsePositive.rate)} ${ok(withList.falsePositive.rate, TARGET.falsePositive, true)} |`);
   if (main.agedNegatives) {
     lines.push(`| 誤判率（只看查得到註冊日期的 ${main.agedNegatives} 個正常網站） | ≤ ${pct(TARGET.falsePositive)} | ${pct(main.falsePositiveAged.rate)} ${ok(main.falsePositiveAged.rate, TARGET.falsePositive, true)} | ${pct(withList.falsePositiveAged.rate)} ${ok(withList.falsePositiveAged.rate, TARGET.falsePositive, true)} |`);
   }
-  lines.push(`| 樣本數 | — | 詐騙 ${main.detection.n}／正常 ${main.falsePositive.n} | 詐騙 ${withList.detection.n}／正常 ${withList.falsePositive.n} |`, '');
-  lines.push('「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。「加上 165 名單」不計入來源是 165 的樣本（它們本來就在名單中）。', '');
+  lines.push(`| 樣本數 | — | 詐騙 ${live.detection.n}／正常 ${live.falsePositive.n} | 詐騙 ${withList.detection.n}／正常 ${withList.falsePositive.n} |`, '');
+  const s165 = main.bySource.find((g) => g.key === '165');
+  lines.push('兩欄使用**同一批**樣本：收集時仍在線的詐騙網域（PhishTank 等），不含 165 樣本。「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。');
+  if (s165) lines.push('', `參考：165 樣本 ${s165.n} 個（多半在公布時已被刪除、查不到註冊日期），只用規則的偵測率 ${pct(s165.rate)}；它們本來就在 165 名單中，所以不列入上表比較。`);
+  lines.push('');
 
   lines.push(...collectLogSection(collectLog));
 
@@ -207,10 +223,11 @@ export function toMarkdown(results, { collectLog = '' } = {}) {
 
 /** history.csv 的一列 */
 export function historyRow(results) {
-  const [main, withList = main] = results;
+  const [main, live = main, withList = live] = results;
   return [main.generatedAt.slice(0, 10), main.windowDays, main.detection.n, main.detection.rate.toFixed(4),
     main.detection.dangerRate.toFixed(4), main.falsePositive.n, main.falsePositive.rate.toFixed(4),
     withList.detection.rate.toFixed(4),
-    Number.isFinite(main.falsePositiveAged.rate) ? main.falsePositiveAged.rate.toFixed(4) : ''].join(',');
+    Number.isFinite(main.falsePositiveAged.rate) ? main.falsePositiveAged.rate.toFixed(4) : '',
+    Number.isFinite(live.detection.rate) ? live.detection.rate.toFixed(4) : ''].join(',');
 }
-export const HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample';
+export const HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample,detection_rules_live';

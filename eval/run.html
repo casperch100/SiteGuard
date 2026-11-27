@@ -17,7 +17,7 @@
 <pre id="history" hidden></pre>
 <script type="module">
   import { parseList } from '../src/lib/blocklist.js';
-  import { evaluate, parseCsv, toMarkdown, historyRow } from '../tools/eval/metrics.mjs';
+  import { evaluateAll, parseCsv, toMarkdown, historyRow } from '../tools/eval/metrics.mjs';
 
   const text = (p) => fetch(p, { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.text(); });
   try {
@@ -30,10 +30,7 @@
     const negatives = negText.split('\n').filter(Boolean);
     const blocklist = parseList(listText, JSON.parse(metaText));
     const negativeAges = await fetch('./cache/negatives_age.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const results = [
-      evaluate({ positives, negatives, blocklist: null, windowDays, negativeAges }),
-      evaluate({ positives, negatives, blocklist, windowDays, negativeAges }),
-    ];
+    const results = evaluateAll({ positives, negatives, blocklist, windowDays, negativeAges });
     const collectLog = await fetch('./data/collect-log.csv', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).catch(() => '');
     window.__evalOutput = { markdown: toMarkdown(results, { collectLog }), history: historyRow(results) };
     document.getElementById('report').textContent = window.__evalOutput.markdown;

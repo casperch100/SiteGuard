@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assessUrl, parseTarget, levenshtein, isAllowedHost, domainForAgeLookup } from '../src/lib/risk.js';
 import { rdapUrl, parseRegistrationDate, ageInDays, isFresh } from '../src/lib/rdap.js';
-import { parseList, serializeList, lookupHost, mergeSuspendedCsv, normalizeHost, rocMonthLabel, sectorLabel } from '../src/lib/blocklist.js';
+import { parseList, serializeList, lookupHost, mergeSuspendedCsv, normalizeHost, rocMonthLabel, sectorLabel, splitCsvLine } from '../src/lib/blocklist.js';
 
 // 測試用的小名單（網域取自 165 公開資料）
 const META = {
@@ -143,4 +143,37 @@ test('RDAP：查詢網址、解析註冊日期、天數與快取', () => {
   assert.equal(isFresh({ regDate: '2026-11-20', checkedAt: now - 29 * 86400000 }, now), true);
   assert.equal(isFresh({ regDate: '2026-11-20', checkedAt: now - 31 * 86400000 }, now), false);
   assert.equal(isFresh({ regDate: null, checkedAt: now - 2 * 86400000 }, now), false); // 查不到的 1 天後重試
+});
+
+test('Punycode（國際化字元）網域加分', () => {
+  const r = assessUrl('https://xn--pypal-4ve.com/');
+  assert.ok(r.reasons.some((x) => x.text.includes('Punycode')), JSON.stringify(r.reasons));
+  assert.equal(r.level, 'suspicious');
+});
+
+test('回報過的網站不查詢註冊日期', () => {
+  const reports = { 'some-shop.xyz': { category: '假購物' } };
+  assert.equal(domainForAgeLookup('https://some-shop.xyz/', { reports }), null);
+  assert.equal(domainForAgeLookup('https://other-shop.xyz/', { reports }), 'other-shop.xyz');
+});
+
+test('CSV：雙引號包住、含逗號或 "" 的欄位', () => {
+  assert.deepEqual(splitCsvLine('11511,a.top,電子商務,條例,單位'), ['11511', 'a.top', '電子商務', '條例', '單位']);
+  assert.deepEqual(splitCsvLine('11511,b.top,"金融保險,投資","含 ""引號"" 的欄位",單位'),
+    ['11511', 'b.top', '金融保險,投資', '含 "引號" 的欄位', '單位']);
+  const csv = '民國年月,網域,網站性質,法律依據,聲請單位\n11511,quoted-scam.top,"金融保險,投資",條例,單位\n';
+  const merged = mergeSuspendedCsv(csv, LIST, isAllowedHost);
+  assert.equal(merged.added, 1);
+  const r = assessUrl('https://quoted-scam.top/', { blocklist: { hosts: merged.hosts, meta: merged.meta } });
+  assert.equal(r.category, '涉詐網站（金融保險,投資）');
+});
+
+test('二層公眾後綴（和評估工具一致）', () => {
+  assert.equal(parseTarget('https://shop.example.com.br/').registrable, 'example.com.br');
+  assert.equal(parseTarget('https://a.b.example.co.kr/').registrable, 'example.co.kr');
+});
+
+test('Demo 頁的保留網域仍會被規則判為可疑', () => {
+  assert.equal(level('https://paypa1.example/signin'), 'suspicious');
+  assert.equal(level('https://shopee.example/'), 'suspicious');
 });

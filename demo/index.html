@@ -26,7 +26,7 @@
 <main>
   <h1>SiteGuard 測試頁</h1>
   <p class="lead">載入擴充功能後打開這頁：危險連結會加上紅框，可疑連結加上橘色虛線框；滑鼠移到連結上會顯示判斷原因。點擊危險連結會被導向警告頁。</p>
-  <p class="hint">「165 名單」區塊的網域取自內政部警政署公開的涉詐網站資料，而且都已遭停止解析，無法連到詐騙網站；「規則判斷」區塊的網址是虛構的。</p>
+  <p class="hint">「165 名單」區塊的網域取自內政部警政署公開的涉詐網站資料，已遭停止解析；但如果你使用國外 DNS 或 VPN，部分網域仍可能連得到，請在載入擴充功能後再點擊。「規則判斷」區塊的網址是虛構或保留網域（<code>.example</code>），不會連到真實網站。</p>
 
   <section>
     <h2>✅ 正常網站（白名單）</h2>
@@ -51,10 +51,10 @@
   <section>
     <h2>⚠️ 不在 165 名單，但由規則判斷為危險或可疑</h2>
     <ul>
-      <li><a href="https://paypa1.com/signin">https://paypa1.com/signin</a> — 形近字仿冒（可疑）</li>
+      <li><a href="https://paypa1.example/signin">https://paypa1.example/signin</a> — 形近字仿冒（可疑）</li>
       <li><a href="https://line-login-secure.top/">https://line-login-secure.top/</a> — 含品牌名 + 可疑字詞 + 可疑後綴</li>
       <li><a href="https://esunbank-tw-verify-login.online/">https://esunbank-tw-verify-login.online/</a> — 仿冒銀行 + 可疑字詞 + 可疑後綴</li>
-      <li><a href="https://shopee.top/">https://shopee.top/</a> — 同名不同網域</li>
+      <li><a href="https://shopee.example/">https://shopee.example/</a> — 同名不同網域</li>
       <li><a href="http://203.0.113.45/bank/login">http://203.0.113.45/bank/login</a> — 直接用 IP</li>
       <li><a href="https://www.cathaybk.com.tw@evil-site.example/">https://www.cathaybk.com.tw@evil-site.example/</a> — 「@」偽裝</li>
     </ul>

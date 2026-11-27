@@ -66,7 +66,8 @@ jobs:
             ':(exclude)src/data/165-blocklist.txt' ':(exclude)src/data/165-meta.json'
             ':(exclude)src/data/rdap-bootstrap.json' ':(exclude)eval/data/**'
             ':(exclude)eval/REPORT.md' ':(exclude)eval/history.csv'
-            ':(exclude)**/*.png' ':(exclude)**/*.jpg' ':(exclude)dist/**'
+            ':(exclude)**/*.png' ':(exclude)**/*.jpg' ':(exclude)**/*.jpeg' ':(exclude)**/*.gif'
+            ':(exclude)**/*.webp' ':(exclude)**/*.ico' ':(exclude)**/*.zip' ':(exclude)dist/**'
           )
           git diff --no-color "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > pr-review/pr.diff
           git diff --stat "origin/${base_ref}...HEAD" -- . "${excludes[@]}" > pr-review/pr.stat
@@ -123,9 +124,9 @@ jobs:
           diff = open("pr-review/pr.diff", encoding="utf-8", errors="replace").read()
           guidelines = open("pr-review/guidelines.md", encoding="utf-8").read().strip()
           # 提示是以命令列參數傳給 Gemini CLI 的，單一參數上限約 128 KB（Linux MAX_ARG_STRLEN），
-          # 所以差異 100 KB 以內才內嵌，而且整個提示超過 120 KB 時改成讓模型自己讀檔。
+          # 所以差異 100 KB 以內才內嵌，而且整個提示超過 110 KB 時改成讓模型自己讀檔（保留緩衝）。
           INLINE_LIMIT = 100_000
-          PROMPT_LIMIT = 120_000
+          PROMPT_LIMIT = 110_000
           diff_bytes = len(diff.encode("utf-8"))
           head = [
               "你是這個 repo 的程式碼審查者。請依照下方「審查指引」的審查重點與回饋格式，審查這個 Pull Request。",

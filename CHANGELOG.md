@@ -4,6 +4,18 @@
 
 ## [未發布]
 
+### 修正
+- 警告頁只接受 `http`／`https` 網址，其他網址（例如 `javascript:`）不會出現「仍要前往」。
+- 網頁內容載入較慢時，後來出現的連結也會被掃描。
+- 165 名單的 CSV 解析支援含逗號的引號欄位；`com.br`、`co.in`、`co.kr` 等網域後綴的判斷和評估工具一致。
+- 測試頁的規則判斷範例改用保留網域（`.example`），不會連到真實網站。
+
+### 變更
+- 評估報告改成在同一批樣本上比較「只用規則」和「規則＋165 名單」，另外列出 165 新網域的參考數字。
+- 每日評估在推送衝突時先 rebase 再重試，三次都失敗會標示為失敗。
+- 商店說明補上網域年齡快取與設定的儲存用途；上架步驟的版本號改為通用寫法。
+- Gemini 審查的提示大小上限調整為 110 KB，並排除圖片與打包檔。
+
 ## [0.3.0] - 2026-11-27
 
 ### 新增
@@ -46,7 +58,7 @@
 - 第一個版本（POC）：攔截危險網站並顯示警告頁、工具列安全狀態、Popup 查詢與回報、網頁連結標記與滑過提示、右鍵檢查。
 - 啟發式規則：形近字仿冒、同名不同後綴、品牌名稱、「@」偽裝網址、IP 位址、可疑網域後綴與字詞等。
 
-[未發布]: https://github.com/casperch100/SiteGuard/compare/HEAD...HEAD
-[0.3.0]: https://github.com/casperch100/SiteGuard/compare/6aca90b...HEAD
+[未發布]: https://github.com/casperch100/SiteGuard/compare/b88d3de...main
+[0.3.0]: https://github.com/casperch100/SiteGuard/compare/3105cea...b88d3de
 [0.2.0]: https://github.com/casperch100/SiteGuard/commit/3105cea
 [0.1.0]: https://github.com/casperch100/SiteGuard/commit/fcbd912

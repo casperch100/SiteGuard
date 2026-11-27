@@ -36,7 +36,7 @@ def download(url)
     res = Net::HTTP.get_response(uri)
     return res.body.force_encoding('UTF-8') if res.is_a?(Net::HTTPSuccess)
     raise "下載失敗：#{res.code} #{url}" unless res.is_a?(Net::HTTPRedirection)
-    uri = URI(res['location'])
+    uri = URI.join(uri.to_s, res['location'])
   end
   raise "轉址次數過多：#{url}"
 end
@@ -56,7 +56,9 @@ def roc_month_to_label(ym)
 end
 
 # 白名單上的網域不列入，避免誤擋
-allow = File.read(RULES)[/ALLOWLIST\s*=\s*new Set\(\[(.*?)\]\)/m, 1].to_s.scan(/'([^']+)'/).flatten
+allow = File.read(RULES)[/ALLOWLIST\s*=\s*new Set\(\[(.*?)\]\)/m, 1].to_s.scan(/['"]([^'"]+)['"]/).flatten
+# 讀不到白名單時中止：否則官方網站可能被寫進封鎖名單
+abort "讀不到 #{RULES} 的 ALLOWLIST，請檢查格式" if allow.empty?
 allow_set = allow.map(&:downcase)
 allowed = lambda do |host|
   allow_set.any? { |a| host == a || host.end_with?('.' + a) } || host.end_with?('.gov.tw', '.edu.tw') || %w[gov.tw edu.tw].include?(host)

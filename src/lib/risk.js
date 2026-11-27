@@ -18,7 +18,9 @@ const SUSPICIOUS_SCORE = 35;
 
 // 常見的二層公眾後綴（簡化版；正式版改用 Public Suffix List）
 const MULTI_PART_SUFFIXES = new Set([
+  // 和 tools/eval/common.rb 的 MULTI_PART_SUFFIXES 保持一致
   'com.tw', 'net.tw', 'org.tw', 'gov.tw', 'edu.tw', 'idv.tw', 'co.uk', 'co.jp', 'com.cn', 'com.hk', 'com.sg', 'com.au',
+  'com.br', 'co.in', 'co.kr',
 ]);
 
 /** 解析使用者輸入或導航網址。非 http(s) 回傳 null。 */
