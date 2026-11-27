@@ -56,8 +56,9 @@ jobs:
           title="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json title --jq .title)"
           git fetch --no-tags origin "+refs/heads/${base_ref}:refs/remotes/origin/${base_ref}"
           # 審查用的輸入放在 pr-review/：Gemini CLI 不會讀取 .gitignore 裡的路徑（.gemini/ 被忽略）
-          # 先刪除 PR 分支裡可能帶來的 .gemini/（自訂指令、擴充功能等），只留下本 workflow 寫的設定
-          rm -rf .gemini pr-review
+          # 先刪除 PR 分支裡可能帶來的 .gemini/（自訂指令、擴充功能等）與 .geminiignore（可用來藏住檔案不讓模型讀），
+          # 只留下本 workflow 寫的設定
+          rm -rf .gemini pr-review .geminiignore
           mkdir -p .gemini pr-review
 
           # 排除自動產生的資料檔與圖片（不需要審查，也會塞爆上下文）
@@ -104,7 +105,7 @@ jobs:
           {
             "tools": {
               "core": ["read_file", "read_many_files", "list_directory", "glob", "grep_search"],
-              "exclude": ["run_shell_command", "write_file", "replace", "web_fetch", "google_web_search", "save_memory", "write_todos"]
+              "exclude": ["run_shell_command", "write_file", "replace", "web_fetch", "google_web_search", "save_memory", "write_todos", "activate_skill"]
             },
             "model": { "maxSessionTurns": 30 },
             "context": {
@@ -168,7 +169,8 @@ jobs:
       - name: 'Run Gemini review'
         id: 'gemini'
         if: "${{ steps.prep.outputs.skip != 'true' }}"
-        uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
+        # 固定到 commit（v0.1.22），避免第三方 action 未經審查就變更；升級時改這一行
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # v0.1.22
         env:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
         with:
