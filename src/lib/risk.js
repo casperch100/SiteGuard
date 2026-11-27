@@ -129,6 +129,87 @@ export function isAllowedHost(host) {
   return !!t && isAllowlisted(t);
 }
 
+// ---------- 國際化網域（Punycode） ----------
+/** 解碼一個 Punycode 標籤（RFC 3492），例如 xn--pypal-4ve → pаypal。格式錯誤回傳 null。 */
+export function decodePunycodeLabel(label) {
+  if (!label.startsWith('xn--')) return label;
+  const input = label.slice(4);
+  const base = 36, tMin = 1, tMax = 26, skew = 38, damp = 700;
+  const adapt = (delta, numPoints, first) => {
+    delta = first ? Math.floor(delta / damp) : delta >> 1;
+    delta += Math.floor(delta / numPoints);
+    let k = 0;
+    while (delta > ((base - tMin) * tMax) >> 1) { delta = Math.floor(delta / (base - tMin)); k += base; }
+    return k + Math.floor(((base - tMin + 1) * delta) / (delta + skew));
+  };
+  const digit = (c) => (c >= 48 && c <= 57 ? c - 22 : c >= 97 && c <= 122 ? c - 97 : c >= 65 && c <= 90 ? c - 65 : base);
+  const sep = input.lastIndexOf('-');
+  const output = sep > 0 ? [...input.slice(0, sep)].map((c) => c.codePointAt(0)) : [];
+  let n = 128, i = 0, bias = 72;
+  for (let pos = sep > 0 ? sep + 1 : 0; pos < input.length;) {
+    const oldi = i;
+    for (let w = 1, k = base; ; k += base) {
+      if (pos >= input.length) return null;
+      const d = digit(input.charCodeAt(pos++));
+      if (d >= base) return null;
+      i += d * w;
+      const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
+      if (d < t) break;
+      w *= base - t;
+    }
+    bias = adapt(i - oldi, output.length + 1, oldi === 0);
+    n += Math.floor(i / (output.length + 1));
+    i %= output.length + 1;
+    output.splice(i++, 0, n);
+  }
+  try { return String.fromCodePoint(...output); } catch { return null; }
+}
+
+// 外觀和拉丁字母幾乎一樣的西里爾、希臘字母（只列常被用來仿冒的）
+const CONFUSABLES = {
+  'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ј': 'j', 'ѕ': 's', 'һ': 'h', 'ԁ': 'd',
+  'ԛ': 'q', 'ԝ': 'w', 'ӏ': 'l', 'ο': 'o', 'α': 'a', 'ν': 'v', 'ρ': 'p', 'τ': 't', 'κ': 'k', 'ι': 'i',
+};
+
+/**
+ * 國際化網域的風險：
+ * - 'mixed'：拉丁字母混用希臘、西里爾字母（例如 pаypal 的 а 是西里爾字母）→ 常見的仿冒手法
+ * - 'native'：其他國際化網域（泰文、中文、帶重音的拉丁字母）→ 正常，不加分
+ * 回傳 { kind, ascii }，ascii 是把相似字元換成拉丁字母後的樣子；不是國際化網域回傳 null。
+ */
+export function idnInfo(host) {
+  const labels = host.split('.');
+  if (!labels.some((l) => l.startsWith('xn--'))) return null;
+  let mixed = false;
+  const ascii = labels.map((l) => {
+    const u = decodePunycodeLabel(l);
+    if (u === null) { mixed = true; return l; }
+    const hasLatin = /[a-z]/i.test(u);
+    const mapped = [...u].map((c) => CONFUSABLES[c] ?? c).join('');
+    if (hasLatin && /[\u0370-\u052f]/.test(u)) mixed = true;       // 同一段裡拉丁字母混用希臘、西里爾字母（重音字母 å ö 不算）
+    if (!hasLatin && /^[\x00-\x7f]+$/.test(mapped) && mapped !== u) mixed = true; // 整段都是相似字元（例如全西里爾的 аррӏе）
+    return mapped;
+  }).join('.');
+  return { kind: mixed ? 'mixed' : 'native', ascii };
+}
+
+const onDomain = (host, d) => host === d || host.endsWith('.' + d);
+
+/** 這個網址是不是品牌自己的網站（官方、品牌擁有的其他網域、各國同名網域、品牌頂級網域） */
+function isBrandOwned(brand, host) {
+  if (brand.official.some((d) => onDomain(host, d)) || (brand.owned || []).some((d) => onDomain(host, d))) return true;
+  if (brand.brandTld && (host === brand.brandTld || host.endsWith('.' + brand.brandTld))) return true;
+  if (brand.ccTld) {
+    // 同名＋國家後綴：google.de、google.co.jp、google.com.py、shopee.co.id（可以有子網域）
+    const h = host.replace(/^www\./, '');
+    return brand.official.some((d) => {
+      const core = coreName(d);
+      return new RegExp(`(^|\\.)${core}\\.((com|co|net|org)\\.)?[a-z]{2}$`).test(h);
+    });
+  }
+  return false;
+}
+
 /** 找出最像哪個品牌的仿冒網址（只取最強的一條理由）。 */
 function brandSignal(t) {
   const tokens = t.host.split(/[.-]/);
@@ -138,9 +219,10 @@ function brandSignal(t) {
   const consider = (weight, text) => { if (!best || weight > best.weight) best = { weight, text }; };
 
   for (const brand of BRANDS) {
-    if (brand.official.some((d) => t.registrable === d || t.host.endsWith('.' + d))) continue;
+    if (isBrandOwned(brand, t.host)) continue;
 
     for (const official of brand.official) {
+      if ((brand.noFuzzy || []).includes(official)) continue;
       const oCore = coreName(official);
       if (core === oCore) {
         consider(45, `網域名稱和「${brand.name}」官方網站（${official}）相同，但網域後綴不同`);
@@ -154,7 +236,10 @@ function brandSignal(t) {
       }
     }
 
-    const hit = brand.keywords.find((k) => (k.length >= 6 ? t.host.includes(k) : tokens.includes(k)));
+    const hit = brand.keywords.find((k) => {
+      if ((brand.tokenStart || []).includes(k)) return tokens.some((x) => x.startsWith(k)); // huaweicloud 不算 icloud
+      return k.length >= 6 ? t.host.includes(k) : tokens.includes(k);
+    });
     if (hit) consider(40, `網址含有「${hit}」字樣，但不是「${brand.name}」的官方網站`);
   }
   return best;
@@ -216,10 +301,21 @@ export function assessUrl(input, { reports = {}, blocklist = null, domainAgeDays
   }
 
   // 4. 啟發式規則
-  const brand = brandSignal(t);
+  const idn = idnInfo(t.host);
+  let brand = brandSignal(t);
+  if (idn?.kind === 'mixed') {
+    // 把相似字元換回拉丁字母後再比一次品牌：換完剛好是官方網站 → 幾乎可以確定是仿冒
+    const owner = BRANDS.find((b) => isBrandOwned(b, idn.ascii));
+    const alt = owner
+      ? { weight: 50, text: `網址用外觀相似的字元仿冒「${owner.name}」（看起來像 ${idn.ascii}）` }
+      : brandSignal(parseTarget(idn.ascii) || t);
+    if (alt && (!brand || alt.weight > brand.weight)) brand = alt;
+  }
   if (brand) add(brand.weight, brand.text);
 
-  if (t.host.split('.').some((l) => l.startsWith('xn--'))) add(40, '網址使用國際化字元（Punycode），可能是外觀相似的假網址');
+  if (idn?.kind === 'mixed') {
+    add(40, '網址混用外觀相似的其他文字（Punycode），可能是假網址');
+  }
   if (t.isIp) add(30, '直接使用 IP 位址，而不是網域名稱');
   if (t.hasUserInfo) {
     if (/^[\w-]+(\.[\w-]+)+$/.test(t.userInfo)) {

@@ -25,8 +25,10 @@ const blocklist = parseList(read('src/data/165-blocklist.txt'), JSON.parse(read(
 const windowDays = Number(arg('--window', 28));
 const agesPath = join(ROOT, 'eval/cache/negatives_age.json');
 const negativeAges = existsSync(agesPath) ? JSON.parse(readFileSync(agesPath, 'utf8')) : null;
+const holdoutPath = join(ROOT, 'eval/cache/negatives_holdout.txt');
+const holdout = existsSync(holdoutPath) ? readFileSync(holdoutPath, 'utf8').split('\n').filter(Boolean) : [];
 
-const results = evaluateAll({ positives, negatives, blocklist, windowDays, negativeAges });
+const results = evaluateAll({ positives, negatives, holdout, blocklist, windowDays, negativeAges });
 
 const logPath = join(ROOT, 'eval/data/collect-log.csv');
 const collectLog = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
@@ -35,6 +37,7 @@ writeFileSync(join(ROOT, 'eval/REPORT.md'), toMarkdown(results, { collectLog }))
 const histPath = join(ROOT, 'eval/history.csv');
 const today = results[0].generatedAt.slice(0, 10);
 const lines = existsSync(histPath) ? readFileSync(histPath, 'utf8').split('\n').filter(Boolean) : [HISTORY_HEADER];
+lines[0] = HISTORY_HEADER; // 欄位有增加時更新標題列
 const kept = lines.filter((l, i) => i === 0 || !l.startsWith(today + ',')); // 同一天重跑就覆蓋
 kept.push(historyRow(results));
 writeFileSync(histPath, kept.join('\n') + '\n');

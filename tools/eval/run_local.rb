@@ -9,7 +9,7 @@ require 'socket'
 require 'tmpdir'
 require 'fileutils'
 
-HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample,detection_rules_live'
+HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample,detection_rules_live,false_positive_holdout' # 和 metrics.mjs 的 HISTORY_HEADER 相同
 
 ROOT = File.expand_path('../..', __dir__)
 require 'cgi'
@@ -42,7 +42,7 @@ begin
   unless row.empty?
     hist = File.join(ROOT, 'eval/history.csv')
     lines = File.exist?(hist) ? File.readlines(hist, chomp: true).reject(&:empty?) : [HISTORY_HEADER]
-    lines = [lines.first] + lines.drop(1).reject { |l| l.start_with?(row[0, 10] + ',') } # 同一天重跑就覆蓋
+    lines = [HISTORY_HEADER] + lines.drop(1).reject { |l| l.start_with?(row[0, 10] + ',') } # 同一天重跑就覆蓋
     File.write(hist, (lines + [row]).join("\n") + "\n")
   end
   puts md.lines.first(14).join

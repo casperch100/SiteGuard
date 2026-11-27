@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assessUrl, parseTarget, levenshtein, isAllowedHost, domainForAgeLookup } from '../src/lib/risk.js';
+import { assessUrl, parseTarget, levenshtein, isAllowedHost, domainForAgeLookup, decodePunycodeLabel, idnInfo } from '../src/lib/risk.js';
 import { rdapUrl, parseRegistrationDate, ageInDays, isFresh } from '../src/lib/rdap.js';
 import { parseList, serializeList, lookupHost, mergeSuspendedCsv, normalizeHost, rocMonthLabel, sectorLabel, splitCsvLine } from '../src/lib/blocklist.js';
 
@@ -149,7 +149,7 @@ test('RDAP：查詢網址、解析註冊日期、天數與快取', () => {
 test('Punycode（國際化字元）網域加分', () => {
   const r = assessUrl('https://xn--pypal-4ve.com/');
   assert.ok(r.reasons.some((x) => x.text.includes('Punycode')), JSON.stringify(r.reasons));
-  assert.equal(r.level, 'suspicious');
+  assert.equal(r.level, 'danger'); // 混用西里爾字母，換回拉丁字母後就是 paypal.com
 });
 
 test('回報過的網站不查詢註冊日期', () => {
@@ -200,4 +200,31 @@ test('網址帳號欄位有錯誤編碼時不會出錯', () => {
   const t = parseTarget('https://user%80@example.com/');
   assert.equal(t.userInfo, 'user%80');
   assert.equal(assessUrl('http://www.bank.com%FF@phish.example/').ok, true);
+});
+
+test('品牌自己的網域不誤判', () => {
+  for (const u of ['https://www.google.de/', 'https://google.co.jp/', 'https://google.com.py/', 'https://blog.google/',
+    'https://www.googletagmanager.com/', 'https://edge.apple/', 'https://cdn-apple.com/', 'https://shopee.co.id/',
+    'https://shopee.com.my/', 'https://static.line-scdn.net/', 'https://paypal.me/x', 'https://www.cathaylife.com.tw/',
+    'https://www.post-gazette.com/', 'https://pcloud.com/', 'https://cloud.com/', 'https://huaweicloud.com/', 'https://hicloud.com/']) {
+    assert.ok(!['suspicious', 'danger'].includes(level(u)), u);
+  }
+});
+
+test('仿冒品牌仍會被抓到', () => {
+  for (const u of ['https://google-login.top/', 'https://shopee-tw.xyz/', 'https://cathaybk-verify.com/', 'https://twpost-pay.com/',
+    'https://line-login-secure.com/', 'https://icloud-find.com/', 'https://paypa1.com/']) {
+    assert.ok(['suspicious', 'danger'].includes(level(u)), u);
+  }
+});
+
+test('國際化網域：拉丁字母混用相似字元才加重分數', () => {
+  assert.equal(decodePunycodeLabel('xn--pypal-4ve'), 'pаypal');        // а 是西里爾字母
+  assert.equal(decodePunycodeLabel('xn--80ak6aa92e'), 'аррӏе');        // 整段西里爾字元拼成 apple
+  assert.equal(idnInfo('xn--pypal-4ve.com').kind, 'mixed');
+  assert.equal(idnInfo('xn--80ak6aa92e.com').kind, 'mixed');
+  assert.equal(idnInfo('xn--cksr0a.tw').kind, 'native');             // 中文網域
+  assert.equal(level('https://xn--cksr0a.tw/'), 'unknown');
+  assert.equal(idnInfo('xn--ngstr-lra8j.com').kind, 'native');       // ångström：重音字母不算混用
+  assert.equal(level('https://xn--80ak6aa92e.com/'), 'danger');       // 看起來是 apple.com
 });

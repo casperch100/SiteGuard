@@ -30,7 +30,9 @@
     const negatives = negText.split('\n').filter(Boolean);
     const blocklist = parseList(listText, JSON.parse(metaText));
     const negativeAges = await fetch('./cache/negatives_age.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const results = evaluateAll({ positives, negatives, blocklist, windowDays, negativeAges });
+    const holdout = await fetch('./cache/negatives_holdout.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).catch(() => '')
+      .then((t) => t.split('\n').filter(Boolean));
+    const results = evaluateAll({ positives, negatives, holdout, blocklist, windowDays, negativeAges });
     const collectLog = await fetch('./data/collect-log.csv', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).catch(() => '');
     window.__evalOutput = { markdown: toMarkdown(results, { collectLog }), history: historyRow(results) };
     document.getElementById('report').textContent = window.__evalOutput.markdown;
