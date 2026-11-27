@@ -150,6 +150,7 @@ src/background.js          Service Worker：攔截、badge、右鍵選單、165 
 src/lib/risk.js            風險判斷引擎（純函式，和測試、評估共用）
 src/lib/blocklist.js       165 名單的解析、查詢、CSV 合併（純函式）
 src/lib/rdap.js            網域註冊日期：查詢網址、解析回應、快取期限（純函式）
+src/lib/feedback.js        「判斷錯了？」：產生預先填好的 GitHub Issue 網址（純函式）
 src/data/rules.js          白名單、品牌清單、可疑後綴與字詞
 src/data/165-blocklist.txt 165 名單內建快照
 src/data/165-meta.json     165 名單的分類、資料月份、來源
@@ -161,6 +162,7 @@ src/content/               網頁上的連結標記與滑過提示
 icons/                     擴充功能圖示（由 tools/make_icons.rb 產生）
 docs/index.html            隱私權政策（GitHub Pages 發布）
 docs/DEVELOPMENT.md        本文件
+docs/DNR-DESIGN.md         用 declarativeNetRequest 在連線前攔截的設計（暫緩）
 demo/index.html            Demo 測試頁
 test/                      引擎測試
 eval/                      評估資料、報告、每日趨勢
