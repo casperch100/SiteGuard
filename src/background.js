@@ -46,13 +46,16 @@ async function loadBundledList() {
 }
 
 async function loadBlocklist() {
-  const bundled = await loadBundledList();
-  const { list165 } = await chrome.storage.local.get('list165');
+  // 先比對資料月份，只解析較新的那一份（Service Worker 每次被喚醒都會重新載入，避免解析兩次）
+  const [bundledMeta, { list165 }] = await Promise.all([
+    fetch(chrome.runtime.getURL('src/data/165-meta.json')).then((r) => r.json()),
+    chrome.storage.local.get('list165'),
+  ]);
   // 已儲存的名單比內建快照舊（例如擴充功能更新後內建了較新的資料）就不用
-  if (list165?.text && (list165.meta?.dataMonth ?? '') >= (bundled.meta.dataMonth ?? '')) {
+  if (list165?.text && (list165.meta?.dataMonth ?? '') >= (bundledMeta.dataMonth ?? '')) {
     return parseList(list165.text, list165.meta);
   }
-  return bundled;
+  return loadBundledList();
 }
 
 /** 從政府資料開放平臺下載最新的「遭停止解析涉詐網站」並合併。不會傳送任何使用者資料。 */
@@ -97,9 +100,28 @@ let bootstrapPromise = null;
 const inflight = new Map();
 
 function getAgeCache() {
-  ageCachePromise ??= chrome.storage.local.get('domainAges').then((o) => o.domainAges || {});
+  ageCachePromise ??= chrome.storage.local.get('domainAges').then(async (o) => {
+    const cache = o.domainAges || {};
+    if (pruneAgeCache(cache)) await chrome.storage.local.set({ domainAges: cache });
+    return cache;
+  });
   return ageCachePromise;
 }
+
+/** 刪除過期的查詢結果（有註冊日期的 30 天、查不到的 1 天），回傳是否有刪除 */
+function pruneAgeCache(cache) {
+  let removed = false;
+  for (const k of Object.keys(cache)) {
+    if (!isFresh(cache[k])) {
+      delete cache[k];
+      removed = true;
+    }
+  }
+  return removed;
+}
+
+// 查詢時間只記到日期（UTC），不保存精確的造訪時刻
+const today = () => Math.floor(Date.now() / 86400000) * 86400000;
 
 function getBootstrap() {
   bootstrapPromise ??= fetch(chrome.runtime.getURL('src/data/rdap-bootstrap.json')).then((r) => r.json());
@@ -107,6 +129,7 @@ function getBootstrap() {
 }
 
 async function saveAgeCache(cache) {
+  pruneAgeCache(cache);
   const keys = Object.keys(cache);
   if (keys.length > AGE_CACHE_MAX) {
     keys.sort((a, b) => cache[a].checkedAt - cache[b].checkedAt)
@@ -143,7 +166,7 @@ async function lookupDomainAge(domain) {
   if (inflight.has(domain)) return inflight.get(domain);
   const generation = ageCacheGeneration;
   const p = fetchRegistration(domain).then(async (r) => {
-    const entry = { ...r, checkedAt: Date.now() };
+    const entry = { ...r, checkedAt: today() };
     if (generation !== ageCacheGeneration) return entry; // 查詢期間使用者清除了快取：結果不存
     const latest = await getAgeCache();
     latest[domain] = entry;
@@ -157,14 +180,16 @@ async function lookupDomainAge(domain) {
 /**
  * 判斷網址的風險。
  * lookup=true 時，如果需要且還沒查過，會先查詢網域註冊日期（使用者主動查詢、導航時使用）；
- * lookup=false 只用已快取的結果（網頁連結標記、滑過提示，避免把頁面上每個連結的網域都送出去）。
+ * lookup=false 不對外查詢，只用已快取的結果（工具列 badge、導航時的第一次判斷）。
+ * useAgeCache=false 連快取也不用：網頁送來的查詢（連結標記、滑過提示）結果會出現在網頁上，
+ * 如果用了個人快取，網頁就能從標記推測使用者查過哪些網域。
  */
-async function check(url, { lookup = false } = {}) {
+async function check(url, { lookup = false, useAgeCache = true } = {}) {
   const [reports, blocklist, settings] = await Promise.all([getReports(), getBlocklist(), getSettings()]);
   const ctx = { reports, blocklist };
   const domain = settings.domainAgeLookup ? domainForAgeLookup(url, ctx) : null;
   const looked = domain && lookup ? await lookupDomainAge(domain) : null;
-  const cache = await getAgeCache();
+  const cache = useAgeCache ? await getAgeCache() : {};
   const entry = domain ? (isFresh(cache[domain]) ? cache[domain] : looked) : null;
   const domainAgeDays = (reg) => {
     const e = reg === domain && entry ? entry : cache[reg];
@@ -175,28 +200,39 @@ async function check(url, { lookup = false } = {}) {
   return result;
 }
 
-/** 只用已快取的網域年齡（不對外查詢），給網頁連結的批次標記使用 */
-async function cachedAgeFn() {
-  const [settings, cache] = await Promise.all([getSettings(), getAgeCache()]);
-  if (!settings.domainAgeLookup) return null;
-  return (reg) => {
-    const e = cache[reg];
-    return isFresh(e) && e.regDate ? ageInDays(e.regDate) : null;
-  };
+
+/**
+ * 網頁連結的快取鍵：主機名稱以外，也包含會影響分數的協定與「@」前面的帳號欄位
+ * （https://neutral.example/ 和 https://www.bank.com@neutral.example/ 分數不同）。必須和 content.js 的 linkKey 相同。
+ */
+function linkKey(url) {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.username ? u.username + '@' : ''}${u.hostname.toLowerCase()}`;
+  } catch {
+    return null;
+  }
 }
 
 // ---------- 導航攔截 ----------
+const navSeq = new Map(); // tabId → 最新一次導航的編號
+
 async function redirectToWarning(tabId, url, result) {
   const bypass = await getBypass();
-  if (bypass.has(result.registrable)) return false;
+  if (bypass.has(result.siteKey)) return false;
   await chrome.tabs.update(tabId, { url: `${WARNING_PAGE}?url=${encodeURIComponent(url)}` }).catch(() => {});
   return true;
 }
 
+// 注意：onBeforeNavigate 不會暫停導航，請求可能已經送出；這裡做的是「盡快切換到警告頁」，
+// 不是在連線前攔截（連線前攔截的設計見 docs/DNR-DESIGN.md，目前暫緩）。
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;
+  const seq = (navSeq.get(details.tabId) || 0) + 1;
+  navSeq.set(details.tabId, seq);
+  const superseded = () => navSeq.get(details.tabId) !== seq; // 判斷期間分頁又開始了新的導航
   const result = await check(details.url);
-  if (!result.ok) return;
+  if (!result.ok || superseded()) return;
   if (result.level === 'danger') {
     await redirectToWarning(details.tabId, details.url, result);
     return;
@@ -204,6 +240,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   // 還沒查過這個網域的註冊日期：先放行，背景查詢；查到有問題再補上警告
   if (result.ageLookup !== 'pending') return;
   const later = await check(details.url, { lookup: true });
+  if (superseded()) return;
   const tab = await chrome.tabs.get(details.tabId).catch(() => null);
   if (!tab) return;
   const current = parseTarget(tab.pendingUrl || tab.url);
@@ -234,6 +271,8 @@ async function updateBadge(tabId, url) {
   await chrome.action.setTitle({ tabId, title: `SiteGuard：${info.label}` });
 }
 
+chrome.tabs.onRemoved.addListener((tabId) => navSeq.delete(tabId));
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url || changeInfo.status === 'complete') updateBadge(tabId, tab.url).catch(() => {});
 });
@@ -262,8 +301,8 @@ chrome.contextMenus.onClicked.addListener((info) => {
 // ---------- 訊息 ----------
 const handlers = {
   // Popup、警告頁傳 lookup: true（使用者主動查看，可以查詢註冊日期）；網頁上的滑過提示不傳（只用快取）
-  async check({ url, lookup }) {
-    return check(url, { lookup: !!lookup });
+  async check({ url, lookup, fromPage }) {
+    return check(url, { lookup: !!lookup && !fromPage, useAgeCache: !fromPage });
   },
 
   async getSettings() {
@@ -300,13 +339,15 @@ const handlers = {
     return { ok: true, dataMonth, count: list.hosts.size ?? count, origin, updatedAt };
   },
 
-  // content script 一次送多個網址，回傳以 host 為 key 的結果
+  // content script 一次送多個網址，回傳以 linkKey 為 key 的結果。
+  // 不使用網域年齡（連快取也不用），理由見 check() 的說明。
   async checkMany({ urls }) {
-    const [reports, blocklist, domainAgeDays] = await Promise.all([getReports(), getBlocklist(), cachedAgeFn()]);
+    const [reports, blocklist] = await Promise.all([getReports(), getBlocklist()]);
     const out = {};
     for (const url of (Array.isArray(urls) ? urls : []).slice(0, MAX_URLS_PER_BATCH)) {
-      const r = assessUrl(url, { reports, blocklist, domainAgeDays });
-      if (r.ok) out[r.host] = { level: r.level, score: r.score, reasons: r.reasons.slice(0, 3), category: r.category };
+      const r = assessUrl(url, { reports, blocklist });
+      const key = linkKey(url);
+      if (r.ok && key) out[key] = { level: r.level, score: r.score, reasons: r.reasons.slice(0, 3), category: r.category };
     }
     return out;
   },
@@ -315,7 +356,7 @@ const handlers = {
     const t = parseTarget(url);
     if (!t) return { ok: false };
     const reports = await getReports();
-    reports[t.registrable] = { category, reportedAt: Date.now() };
+    reports[t.siteKey] = { category, reportedAt: Date.now() };
     await chrome.storage.local.set({ reports });
     return { ok: true };
   },
@@ -324,8 +365,9 @@ const handlers = {
     const t = parseTarget(url);
     if (!t) return { ok: false };
     const reports = await getReports();
-    delete reports[t.registrable];
+    delete reports[t.siteKey];
     delete reports[t.host];
+    if (!t.tenant) delete reports[t.registrable];
     await chrome.storage.local.set({ reports });
     return { ok: true };
   },
@@ -335,7 +377,7 @@ const handlers = {
     const t = parseTarget(url);
     if (!t) return { ok: false };
     const bypass = await getBypass();
-    bypass.add(t.registrable);
+    bypass.add(t.siteKey);
     await chrome.storage.session.set({ bypass: [...bypass] });
     return { ok: true };
   },
@@ -344,6 +386,10 @@ const handlers = {
 // 網頁上的 content script 只需要查詢（而且只用快取）；放行、回報、改設定、清除資料只接受擴充功能自己的頁面
 const CONTENT_SCRIPT_TYPES = new Set(['check', 'checkMany']);
 const EXTENSION_ORIGIN = chrome.runtime.getURL('');
+
+// 會修改儲存資料的操作依序執行，避免兩個視窗同時回報時，後寫入的覆蓋掉先寫入的
+const WRITE_TYPES = new Set(['report', 'unreport', 'bypass', 'setSettings', 'clearData']);
+let writeQueue = Promise.resolve();
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = handlers[msg?.type];
@@ -354,8 +400,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'not allowed' });
       return false;
     }
-    msg = { ...msg, lookup: false }; // 網頁不能觸發網域年齡查詢
+    msg = { ...msg, lookup: false, fromPage: true }; // 網頁不能觸發網域年齡查詢，也不使用個人快取
   }
-  handler(msg).then(sendResponse, (err) => sendResponse({ ok: false, error: String(err) }));
+  const run = WRITE_TYPES.has(msg.type)
+    ? (writeQueue = writeQueue.catch(() => {}).then(() => handler(msg)))
+    : handler(msg);
+  run.then(sendResponse, (err) => sendResponse({ ok: false, error: String(err) }));
   return true; // 非同步回應
 });

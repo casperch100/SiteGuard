@@ -105,7 +105,7 @@ export function rocMonthLabel(ym) {
  */
 export function mergeSuspendedCsv(csv, base, isAllowed = () => false) {
   const lines = csv.replace(/^﻿/, '').split(/\r?\n/);
-  const header = (lines.shift() || '').split(',').map((s) => s.trim());
+  const header = splitCsvLine(lines.shift() || '').map((s) => s.trim()); // 標題列也可能有雙引號
   const col = (name) => header.indexOf(name);
   const iMonth = col('民國年月');
   const iHost = col('網域');

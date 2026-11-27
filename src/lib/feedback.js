@@ -8,6 +8,14 @@ export const ISSUES_NEW = 'https://github.com/casperch100/SiteGuard/issues/new';
 const LEVEL_OPTION = { danger: '危險（跳出警告頁）', suspicious: '可疑（Popup 或連結標示為可疑）' };
 const MAX_REASONS = 6;
 
+/**
+ * 回報用的原因文字：「@」偽裝規則的原因會引用網址中「@」前面的內容（可能是帳號或代碼），
+ * 回報前改成不含原文的說法，只帶網域與規則本身。
+ */
+export function safeReasonText(text) {
+  return String(text).replace(/網址用「@」偽裝成「[^」]*」/g, '網址用「@」偽裝成另一個網域');
+}
+
 /** 把網域的 . 改成 [.]，貼在 Issue 裡不會變成可點擊的連結 */
 export function defang(host) {
   return String(host).replace(/\./g, '[.]');
@@ -30,7 +38,7 @@ export function feedbackUrl(result, version = '') {
     p.set('domain', result.host);
     p.set('level', LEVEL_OPTION[result.level]);
     p.set('reasons', (result.reasons || []).filter((r) => r.weight > 0).slice(0, MAX_REASONS)
-      .map((r) => `- ${r.text}`).join('\n'));
+      .map((r) => `- ${safeReasonText(r.text)}`).join('\n'));
   } else {
     p.set('template', 'missed-scam.yml');
     p.set('title', `[漏抓] ${defang(result.host)}`);

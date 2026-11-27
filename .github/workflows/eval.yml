@@ -73,7 +73,8 @@ jobs:
         run: |
           git config user.name "siteguard-eval[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A eval/data/positives.csv eval/data/collect-log.csv eval/data/rdap-pending.json eval/REPORT.md eval/history.csv
+          # 用資料夾而不是個別檔名：rdap-pending.json 只有超過查詢上限時才存在，列出不存在的檔名會讓 git add 失敗
+          git add -A eval/data eval/REPORT.md eval/history.csv
           if git diff --cached --quiet; then
             echo "沒有變更"
           else

@@ -5,7 +5,7 @@
 
 /** 可信任網站（直接判定安全）。 */
 export const ALLOWLIST = new Set([
-  'google.com', 'google.com.tw', 'youtube.com', 'gstatic.com', 'googleusercontent.com', 'googleapis.com',
+  'google.com', 'google.com.tw', 'youtube.com', 'gstatic.com', 'googleapis.com',
   'facebook.com', 'instagram.com', 'line.me', 'apple.com', 'icloud.com', 'microsoft.com', 'live.com',
   'wikipedia.org', 'github.com', 'yahoo.com', 'yahoo.com.tw', 'paypal.com', 'amazon.com', 'netflix.com',
   'shopee.tw', 'momoshop.com.tw', 'pchome.com.tw', 'books.com.tw', '7-11.com.tw', 'ibon.com.tw',
@@ -14,7 +14,8 @@ export const ALLOWLIST = new Set([
 ]);
 
 /** 政府、學術網域後綴（直接判定安全）。 */
-export const TRUSTED_SUFFIXES = ['gov.tw', 'edu.tw'];
+// gov、edu、mil 只有美國政府、學術與軍事單位能註冊
+export const TRUSTED_SUFFIXES = ['gov.tw', 'edu.tw', 'gov', 'edu', 'mil'];
 
 /**
  * 常被仿冒的品牌：keywords 出現在網址中但不是官方網域 → 可疑。
@@ -42,7 +43,7 @@ export const BRANDS = [
     owned: ['facebook.net', 'fbcdn.net', 'fb.com', 'facebook-hardware.com'] },
   { name: 'Apple', keywords: ['apple', 'icloud'], official: ['apple.com', 'icloud.com'], ccTld: true, brandTld: 'apple',
     noFuzzy: ['icloud.com'], tokenStart: ['icloud'],
-    owned: ['apple.news', 'apple-dns.net', 'apple-dns.cn', 'cdn-apple.com', 'apple-cloudkit.com', 'apple-mapkit.com',
+    owned: ['apple.co', 'apple.news', 'apple-dns.net', 'apple-dns.cn', 'cdn-apple.com', 'apple-cloudkit.com', 'apple-mapkit.com',
       'icloud-content.com', 'mzstatic.com', 'apple.com.cn', 'icloud.com.cn'] },
   { name: 'Google', keywords: ['google'], ccTld: true, brandTld: 'google',
     official: ['google.com', 'google.com.tw', 'googleusercontent.com', 'googleapis.com'],

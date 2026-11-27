@@ -84,6 +84,10 @@ jobs:
             "telemetry": { "enabled": false }
           }
           JSON
+          # 指引檔名每次隨機產生：固定的檔名可能被 PR 預先放進 repo，被當成審查指引載入
+          ctx_name="NO-AUTO-CONTEXT-$(python3 -c 'import uuid; print(uuid.uuid4().hex)').md"
+          sed -i "s/SITEGUARD-REVIEW-NO-AUTO-CONTEXT.md/${ctx_name}/" .gemini/settings.json
+          find . -name "${ctx_name}" -not -path './.git/*' -delete
 
           LABEL="${label}" python3 - <<'PY'
           import os, uuid

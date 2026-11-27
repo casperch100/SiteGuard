@@ -14,16 +14,22 @@
   };
   const MAX_LINKS_PER_SCAN = 2000;
   const BATCH_SIZE = 200; // 每次送給背景的網址數，要小於等於 background.js 的 MAX_URLS_PER_BATCH
-  const cache = new Map(); // host -> result
+  const cache = new Map(); // linkKey -> result
   const pending = new Set();
 
   const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => null);
 
-  function linkHost(a) {
+  /**
+   * 連結的主機名稱與快取鍵。快取鍵包含協定與「@」前面的帳號欄位，因為它們會影響分數
+   * （https://www.bank.com@neutral.example/ 不能沿用 https://neutral.example/ 的結果）。
+   * 必須和 background.js 的 linkKey 相同。
+   */
+  function linkInfo(a) {
     try {
       const u = new URL(a.href, location.href);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-      return u.hostname.toLowerCase();
+      const host = u.hostname.toLowerCase();
+      return { host, key: `${u.protocol}//${u.username ? u.username + '@' : ''}${host}` };
     } catch { return null; }
   }
 
@@ -39,12 +45,12 @@
   // ---------- 掃描頁面上的連結 ----------
   async function scan() {
     const anchors = [...document.querySelectorAll('a[href]:not([data-sg-done])')].slice(0, MAX_LINKS_PER_SCAN);
-    const toCheck = new Map(); // host -> sample url
+    const toCheck = new Map(); // linkKey -> sample url
     for (const a of anchors) {
-      const host = linkHost(a);
-      if (!host || host === location.hostname) { a.dataset.sgDone = '1'; continue; }
-      if (cache.has(host)) applyMark(a, cache.get(host));
-      else if (!pending.has(host)) toCheck.set(host, a.href);
+      const info = linkInfo(a);
+      if (!info || info.host === location.hostname) { a.dataset.sgDone = '1'; continue; }
+      if (cache.has(info.key)) applyMark(a, cache.get(info.key));
+      else if (!pending.has(info.key)) toCheck.set(info.key, a.href);
     }
     if (!toCheck.size) return;
 
@@ -54,13 +60,13 @@
     for (let i = 0; i < urls.length; i += BATCH_SIZE) {
       Object.assign(results, (await send({ type: 'checkMany', urls: urls.slice(i, i + BATCH_SIZE) })) || {});
     }
-    for (const host of toCheck.keys()) {
-      cache.set(host, results[host] || null);
-      pending.delete(host);
+    for (const key of toCheck.keys()) {
+      cache.set(key, results[key] || null);
+      pending.delete(key);
     }
     for (const a of anchors) {
-      const host = linkHost(a);
-      if (host && cache.has(host)) applyMark(a, cache.get(host));
+      const info = linkInfo(a);
+      if (info && cache.has(info.key)) applyMark(a, cache.get(info.key));
     }
     // 查詢期間新出現、而且網域剛好在查詢中的連結，這一輪沒有被標記；再掃一次（只會用快取，不會重複查詢）
     if (document.querySelector('a[href]:not([data-sg-done])')) scheduleScan();
@@ -132,15 +138,16 @@
   document.addEventListener('mouseover', (e) => {
     const a = e.target.closest?.('a[href]');
     if (!a || a === hoverAnchor) return;
-    const host = linkHost(a);
-    if (!host || host === location.hostname) return;
+    const info = linkInfo(a);
+    if (!info || info.host === location.hostname) return;
+    const host = info.host;
     hideTip();
     hoverAnchor = a;
     hoverTimer = setTimeout(async () => {
-      let result = cache.get(host);
+      let result = cache.get(info.key);
       if (result === undefined) {
         result = await send({ type: 'check', url: a.href });
-        if (result?.ok) cache.set(host, result);
+        if (result?.ok) cache.set(info.key, result);
       }
       if (hoverAnchor === a) renderTip(a, host, result);
     }, 300);

@@ -16,11 +16,13 @@ export const LEVELS = {
 const DANGER_SCORE = 70;
 const SUSPICIOUS_SCORE = 35;
 
-// 常見的二層公眾後綴（簡化版；正式版改用 Public Suffix List）
+// 常見的二層公眾後綴（簡化版，只涵蓋常見國家；完整做法是改用 Public Suffix List）
 const MULTI_PART_SUFFIXES = new Set([
   // 和 tools/eval/common.rb 的 MULTI_PART_SUFFIXES 保持一致
-  'com.tw', 'net.tw', 'org.tw', 'gov.tw', 'edu.tw', 'idv.tw', 'co.uk', 'co.jp', 'com.cn', 'com.hk', 'com.sg', 'com.au',
-  'com.br', 'co.in', 'co.kr',
+  'com.tw', 'net.tw', 'org.tw', 'gov.tw', 'edu.tw', 'idv.tw', 'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'co.jp', 'ne.jp',
+  'or.jp', 'ac.jp', 'com.cn', 'net.cn', 'org.cn', 'gov.cn', 'com.hk', 'com.sg', 'com.my', 'co.id', 'co.th', 'com.vn',
+  'com.ph', 'com.au', 'net.au', 'org.au', 'co.nz', 'com.br', 'com.mx', 'com.ar', 'com.co', 'com.pe', 'co.in',
+  'co.kr', 'co.za', 'com.tr', 'com.sa', 'com.eg', 'com.ng', 'com.pk', 'com.bd', 'co.il', 'com.ua',
 ]);
 
 // 任何人都能申請子網域的共用平台（和 tools/eval/common.rb 的 PLATFORMS 保持一致）。
@@ -34,8 +36,16 @@ export const PLATFORM_SUFFIXES = [
   'notion.site', 'webcindario.com', '000webhostapp.com', 'duckdns.org', 'ngrok-free.app', 'ngrok.io',
   'trycloudflare.com', 'surge.sh', 'myshopify.com', 'wcomhost.com', 'sites.google.com', 'docs.google.com', 'forms.gle',
   'storage.googleapis.com', 'firebasestorage.googleapis.com', 's3.amazonaws.com', 'cloudfront.net', 'appspot.com',
-  'typedream.app', 'carrd.co', 'webnode.page',
+  'typedream.app', 'carrd.co', 'webnode.page', 'googleusercontent.com', 'drive.google.com', 'script.google.com',
 ];
+
+// 用「網址路徑」區分使用者的共用服務：主機名稱就是服務本身，誰的內容要看路徑。
+// 數字是代表「一個使用者／一份內容」的路徑段數，例如 docs.google.com/forms/d/<id> 是 3 段。
+// 這類網址不能沿用服務商的可信任判斷，回報與放行也只針對那一份內容，不會影響整個服務。
+export const PATH_PLATFORMS = {
+  'sites.google.com': 2, 'docs.google.com': 3, 'drive.google.com': 3, 'script.google.com': 3, 'forms.gle': 1,
+  'storage.googleapis.com': 1, 'firebasestorage.googleapis.com': 4, 's3.amazonaws.com': 1,
+};
 
 /** 解析使用者輸入或導航網址。非 http(s) 回傳 null。 */
 export function parseTarget(input) {
@@ -49,6 +59,12 @@ export function parseTarget(input) {
   if (!host) return null;
   const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith('[');
   const { registrable, suffix, platform } = isIp ? { registrable: host, suffix: '' } : splitDomain(host);
+  // 以路徑區分使用者的服務：取出代表那一份內容的路徑（例如 sites.google.com/view/xxx）
+  let tenant = null;
+  if (PATH_PLATFORMS[host]) {
+    const segs = u.pathname.split('/').filter(Boolean).slice(0, PATH_PLATFORMS[host]);
+    tenant = segs.length ? host + '/' + segs.join('/') : null;
+  }
   return {
     url: u.href,
     protocol: u.protocol,
@@ -56,6 +72,8 @@ export function parseTarget(input) {
     registrable,
     suffix,
     platform: !!platform,
+    tenant,
+    siteKey: tenant || registrable, // 回報與放行的單位
     isIp,
     hasUserInfo: u.username !== '' || u.password !== '',
     userInfo: safeDecode(u.username),
@@ -70,6 +88,7 @@ function safeDecode(s) {
 export function splitDomain(host) {
   const labels = host.split('.');
   if (labels.length <= 1) return { registrable: host, suffix: '' };
+  if (PATH_PLATFORMS[host]) return { registrable: host, suffix: host, platform: true };
   // 共用平台的子網域：最長的平台後綴優先（例如 my.canva.site 先於 canva.site）
   let platform = '';
   for (const p of PLATFORM_SUFFIXES) {
@@ -115,12 +134,13 @@ export function levenshtein(a, b) {
 }
 
 function isAllowlisted(t) {
+  if (t.platform) return false; // 共用平台上的內容是使用者放的，不繼承服務商的可信任判斷
   if (ALLOWLIST.has(t.registrable) || ALLOWLIST.has(t.host)) return true;
   return TRUSTED_SUFFIXES.some((s) => t.host === s || t.host.endsWith('.' + s));
 }
 
 function lookupReports(reports, t) {
-  return reports[t.host] || reports[t.registrable] || null;
+  return reports[t.siteKey] || reports[t.host] || (t.tenant ? null : reports[t.registrable]) || null;
 }
 
 /** 供建置腳本與更新程式共用：主機名稱是否在白名單（白名單上的網域不列入 165 名單） */
@@ -193,6 +213,9 @@ export function idnInfo(host) {
   return { kind: mixed ? 'mixed' : 'native', ascii };
 }
 
+// 任何人都能註冊、也常被當成通用後綴的國碼網域（.cc 也在詐騙常見後綴中）：品牌同名不代表是官方
+const OPEN_CCTLDS = new Set(['cc', 'co', 'me', 'tv', 'io', 'ws', 'pw', 'tk', 'ml', 'ga', 'cf', 'gq', 'to', 'la', 'ly', 'gg', 'vc', 'sh', 'nu', 'su']);
+
 const onDomain = (host, d) => host === d || host.endsWith('.' + d);
 
 /** 這個網址是不是品牌自己的網站（官方、品牌擁有的其他網域、各國同名網域、品牌頂級網域） */
@@ -203,8 +226,9 @@ function isBrandOwned(brand, host) {
     // 同名＋國家後綴：google.de、google.co.jp、google.com.py、shopee.co.id（可以有子網域）
     const h = host.replace(/^www\./, '');
     return brand.official.some((d) => {
-      const core = coreName(d);
-      return new RegExp(`(^|\\.)${core}\\.((com|co|net|org)\\.)?[a-z]{2}$`).test(h);
+      const m = new RegExp(`(^|\\.)${coreName(d)}\\.((com|co|net|org)\\.)?([a-z]{2})$`).exec(h);
+      // 直接接在開放註冊的國碼後面（shopee.cc）不算；google.com.co 這種國家二層網域仍算
+      return !!m && !(m[2] === undefined && OPEN_CCTLDS.has(m[4]));
     });
   }
   return false;
@@ -228,9 +252,9 @@ function brandSignal(t) {
         consider(45, `網域名稱和「${brand.name}」官方網站（${official}）相同，但網域後綴不同`);
       } else if (normCore === oCore) {
         consider(50, `網址「${t.registrable}」用形近字元仿冒「${brand.name}」（${official}）`);
-      } else if (oCore.length >= 5) {
+      } else if (oCore.length >= 6) {
         const d = levenshtein(normCore, oCore);
-        if (d === 1 || (d === 2 && oCore.length >= 8)) {
+        if ((d === 1 && oCore.length >= 6) || (d === 2 && oCore.length >= 8)) {
           consider(50, `網址「${t.registrable}」和「${brand.name}」官方網站（${official}）只差 ${d} 個字`);
         }
       }
@@ -278,7 +302,7 @@ export function assessUrl(input, { reports = {}, blocklist = null, domainAgeDays
   const t = parseTarget(input);
   if (!t) return { ok: false, input, error: '不是有效的網址' };
 
-  const base = { ok: true, input, url: t.url, host: t.host, registrable: t.registrable, checkedAt: Date.now() };
+  const base = { ok: true, input, url: t.url, host: t.host, registrable: t.registrable, siteKey: t.siteKey, checkedAt: Date.now() };
   const reasons = [];
   const add = (weight, text) => reasons.push({ weight, text });
 

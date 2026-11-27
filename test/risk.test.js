@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assessUrl, parseTarget, levenshtein, isAllowedHost, domainForAgeLookup, decodePunycodeLabel, idnInfo } from '../src/lib/risk.js';
-import { feedbackUrl, defang } from '../src/lib/feedback.js';
+import { feedbackUrl, defang, safeReasonText } from '../src/lib/feedback.js';
 import { rdapUrl, parseRegistrationDate, ageInDays, isFresh } from '../src/lib/rdap.js';
 import { parseList, serializeList, lookupHost, mergeSuspendedCsv, normalizeHost, rocMonthLabel, sectorLabel, splitCsvLine } from '../src/lib/blocklist.js';
 
@@ -259,4 +259,63 @@ test('「判斷錯了？」回報網址只帶網域與判斷原因', () => {
   assert.equal(feedbackUrl(assessUrl('https://myship-711-com-tw.cfd/', { blocklist: LIST })), null);
   assert.equal(feedbackUrl(assessUrl('https://x.com/', { reports: { 'x.com': { category: '假購物' } } })), null);
   assert.equal(feedbackUrl(assessUrl('javascript:alert(1)')), null);
+});
+
+test('以路徑區分使用者的共用服務：不沿用服務商的可信任判斷，回報只針對那一份內容', () => {
+  for (const u of ['https://sites.google.com/view/esun-login', 'https://docs.google.com/forms/d/e/abc/viewform',
+    'https://storage.googleapis.com/bucket/paypal-login.html', 'https://script.googleusercontent.com/macros/x']) {
+    assert.ok(level(u) !== 'safe', u);
+  }
+  const t = parseTarget('https://docs.google.com/forms/d/e/abc/viewform');
+  assert.equal(t.siteKey, 'docs.google.com/forms/d/e');
+  assert.equal(parseTarget('https://sites.google.com/view/shop-a/home').siteKey, 'sites.google.com/view/shop-a');
+  assert.equal(domainForAgeLookup('https://sites.google.com/view/shop-a'), null); // 年齡是服務本身的，不查
+  const reports = { 'sites.google.com/view/shop-a': { category: '假購物' } };
+  assert.equal(assessUrl('https://sites.google.com/view/shop-a/pay', { reports }).level, 'danger');
+  assert.equal(assessUrl('https://sites.google.com/view/shop-b', { reports }).level, 'unknown');
+  assert.equal(level('https://www.google.com/search?q=x'), 'safe'); // 一般的 Google 網站不受影響
+});
+
+test('開放註冊的國碼後綴，品牌同名也不算官方網站', () => {
+  assert.equal(level('https://shopee.cc/'), 'suspicious');
+  assert.equal(level('https://paypal.cc/'), 'danger');
+  assert.ok(['suspicious', 'danger'].includes(level('https://netflix.tv/')));
+  assert.ok(!['suspicious', 'danger'].includes(level('https://www.google.de/'))); // 真正的國家網域仍不誤判
+  assert.ok(!['suspicious', 'danger'].includes(level('https://shopee.co.id/')));
+  assert.ok(!['suspicious', 'danger'].includes(level('https://www.google.com.co/'))); // 國家二層網域
+  assert.ok(!['suspicious', 'danger'].includes(level('https://apple.co/x'))); // Apple 自己的短網址
+});
+
+test('常見英文字不會被當成仿冒短品牌名稱', () => {
+  for (const u of ['https://apply.com/', 'https://ample.com/']) assert.equal(level(u), 'unknown', u);
+  assert.equal(level('https://paypa1.com/'), 'suspicious'); // 形近字仍抓得到
+  assert.equal(level('https://app1e.com/'), 'suspicious');
+});
+
+test('更多二層公眾後綴', () => {
+  assert.equal(parseTarget('https://www.lazada.com.my/').registrable, 'lazada.com.my');
+  assert.equal(parseTarget('https://shop.example.co.id/').registrable, 'example.co.id');
+  assert.equal(parseTarget('https://a.example.org.uk/').registrable, 'example.org.uk');
+});
+
+test('美國政府、學術、軍事網域視為可信任', () => {
+  for (const u of ['https://www.irs.gov/', 'https://www.mit.edu/', 'https://www.army.mil/']) assert.equal(level(u), 'safe', u);
+});
+
+test('註冊日期在未來時不當成剛註冊', () => {
+  const now = Date.parse('2026-11-27T12:00:00Z');
+  assert.equal(ageInDays('2027-03-01', now), null);
+  assert.equal(ageInDays('2026-11-27', now), 0);
+});
+
+test('回報網址不帶出網址中「@」前面的內容', () => {
+  const r = assessUrl('https://account.SECRET123@paypa1.com/');
+  assert.ok(r.reasons.some((x) => x.text.includes('SECRET123'))); // 本機顯示仍完整
+  assert.ok(!feedbackUrl(r, '0.4.0').includes('SECRET123'));
+  assert.equal(safeReasonText('網址用「@」偽裝成「www.bank.com」，實際會前往「x.com」'), '網址用「@」偽裝成另一個網域，實際會前往「x.com」');
+});
+
+test('CSV 標題列有雙引號也能解析', () => {
+  const csv = '"民國年月","網域","網站性質","法律依據","聲請單位"\n11511,header-quoted.top,電子商務,條例,單位\n';
+  assert.equal(mergeSuspendedCsv(csv, LIST, isAllowedHost).added, 1);
 });

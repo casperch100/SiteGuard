@@ -26,6 +26,10 @@ async function init() {
       $('feedback').href = fb;
       $('feedback-row').hidden = false;
     }
+  } else {
+    const li = document.createElement('li');
+    li.textContent = '無法取得詳細的判斷原因';
+    $('reasons').replaceChildren(li);
   }
 }
 

@@ -28,7 +28,7 @@
 |---|---|
 | 網域註冊 30 天內／3 個月內／半年內（RDAP，見下方「網域年齡」） | 40／30／15 |
 | 註冊 30 天內**而且**使用詐騙常見後綴（兩者同時出現，加上原本的 40＋15 剛好達到「危險」） | 15 |
-| 形近字或錯字仿冒官方網域（`paypa1.com`） | 50 |
+| 形近字或錯字仿冒官方網域（`paypa1.com`）；只差一兩個字的比對只用於 6 個字以上的品牌名稱 | 50 |
 | 和官方網站同名但後綴不同（`shopee.top`） | 45 |
 | 用「@」偽裝成另一個網域（`www.bank.com@evil.com`）／其他「@」偽裝 | 45／30 |
 | 網址含有品牌名稱，但不是官方網站（`line-login-xxx.com`） | 40 |
@@ -48,7 +48,8 @@
   - 導航到沒查過的網站時：先放行，背景查詢；查到結果後如果變成「危險」，而且分頁還停在同一個網域，才補上警告頁。
   - Popup、警告頁主動查詢時（訊息帶 `lookup: true`）。
   - 網頁連結標記與滑過提示**不查**，只用已快取的結果，避免把頁面上每個連結的網域都送出去。
-- **快取**：`chrome.storage.local` 的 `domainAges`，查到的保存 30 天，查不到的 1 天後重試，最多 3,000 筆。
+- **快取**：`chrome.storage.local` 的 `domainAges`，查到的保存 30 天，查不到的 1 天後重試，過期即刪除，最多 3,000 筆；查詢時間只記到日。
+- **網頁上的連結**：標記與滑過提示不查詢，也不使用快取（標記寫在網頁讀得到的屬性上，用了快取等於讓網頁推測使用者查過哪些網域）。
 - **設定**：`chrome.storage.local` 的 `settings.domainAgeLookup`，預設開啟，可在設定頁（`src/options/`）關閉。
 
 更新 RDAP 對照表：
@@ -177,5 +178,6 @@ store/                     上架資料：商店文案、截圖、送審步驟
 ## 已知的技術限制
 
 - **網域解析**：目前用簡化的公眾後綴表，之後可改用完整的 Public Suffix List。
-- **攔截方式**：目前在 `webNavigation.onBeforeNavigate` 時導向警告頁；改用 `declarativeNetRequest` 規則可以更早攔截，設計見 [DNR-DESIGN.md](DNR-DESIGN.md)。
+- **攔截方式**：目前在 `webNavigation.onBeforeNavigate` 時導向警告頁。這個事件不會暫停導航，詐騙網站可能已經收到請求（含完整網址），所以只能說「盡快切換到警告頁」，不是連線前攔截。改用 `declarativeNetRequest` 規則才能在請求送出前擋下，設計見 [DNR-DESIGN.md](DNR-DESIGN.md)。
+- **共用平台**：子網域型（`xxx.github.io`）以子網域為單位；路徑型（`sites.google.com/view/xxx`、`docs.google.com/forms/d/xxx`）以路徑為單位，都不沿用服務商的可信任判斷。清單在 `src/lib/risk.js` 的 `PLATFORM_SUFFIXES` 與 `PATH_PLATFORMS`。
 - **回報**：只存在使用者自己的電腦。如果要分享給其他使用者，需要後端、防灌票機制與人工審核。
