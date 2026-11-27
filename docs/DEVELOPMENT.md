@@ -124,11 +124,12 @@ ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh to
 
 改動一律走 Pull Request，由 Gemini 自動審查（`.github/workflows/gemini-dispatch.yml`、`gemini-review.yml`，改寫自 [run-gemini-cli](https://github.com/google-github-actions/run-gemini-cli) 的官方範例）。
 
-- **開 PR 時自動審查**（從 fork 來的 PR 不審查）。
+- **開 PR，或 PR 推送新的改動時自動審查**（從 fork 來的 PR 不審查）。
 - 在 PR 留言 `@gemini-cli /review` 可以重新審查，後面可以加上想特別檢查的重點，例如 `@gemini-cli /review 請特別檢查 RDAP 查詢有沒有送出完整網址`。只有 repo 擁有者與協作者的留言會觸發。
 - 審查語言與重點寫在 repo 根目錄的 [GEMINI.md](../GEMINI.md)。
 - 需要在 repo 的 Secrets 設定 `GEMINI_API_KEY`（[Google AI Studio](https://aistudio.google.com/apikey) 建立，有免費額度）。
 - AI 審查只是參考：不會自動合併，也沒有寫入 repo 的權限。
+- Gemini CLI 暫時固定在 0.68.0（0.70.0 起安裝審查擴充功能會失敗，見 [gemini-cli#30416](https://github.com/google-gemini/gemini-cli/issues/30416)）；修好後可以在 `gemini-review.yml` 移除，或用 repo 變數 `GEMINI_CLI_VERSION` 覆寫。
 
 ## 專案結構
 

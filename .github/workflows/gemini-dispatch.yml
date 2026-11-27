@@ -3,7 +3,7 @@
 # 只保留「審查 PR」：拿掉了 issue 分類、自由指令（invoke）與執行計畫（plan-execute，會寫入 repo）等功能。
 #
 # 觸發方式：
-#   - 開 PR 時自動審查（不含從 fork 來的 PR，避免陌生人消耗額度）
+#   - 開 PR、重新開啟 PR，或 PR 推送新的改動時自動審查（不含從 fork 來的 PR，避免陌生人消耗額度）
 #   - 在 PR 留言「@gemini-cli /review」重新審查，可以在後面加上想要特別檢查的重點
 #     只有 repo 擁有者或協作者的留言會觸發
 #
@@ -16,6 +16,8 @@ on:
   pull_request:
     types:
       - 'opened'
+      - 'reopened'
+      - 'synchronize'   # PR 推送新的改動時重新審查
   pull_request_review_comment:
     types:
       - 'created'
