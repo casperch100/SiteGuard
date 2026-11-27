@@ -9,6 +9,7 @@ import { rdapUrl, parseRegistrationDate, ageInDays, isFresh, LOOKUP_TIMEOUT_MS }
 const WARNING_PAGE = chrome.runtime.getURL('src/warning/warning.html');
 const CHECK_PAGE = chrome.runtime.getURL('src/popup/popup.html');
 const UPDATE_ALARM = 'update-165';
+const MAX_URLS_PER_BATCH = 500; // content script 每批最多送幾個網址（content.js 的 BATCH_SIZE 要小於等於這個值）
 const UPDATE_PERIOD_MINUTES = 7 * 24 * 60; // 每週一次（資料集為每月更新）
 
 // ---------- 儲存 ----------
@@ -91,6 +92,7 @@ async function getSettings() {
 // 只送可註冊網域（例如 example.com），直接查該頂級網域的註冊局；結果快取 30 天（查不到的 1 天後重試）。
 const AGE_CACHE_MAX = 3000;
 let ageCachePromise = null;
+let ageCacheGeneration = 0; // 清除快取時遞增，讓清除前開始的查詢不會把舊資料寫回去
 let bootstrapPromise = null;
 const inflight = new Map();
 
@@ -139,10 +141,13 @@ async function lookupDomainAge(domain) {
   const cache = await getAgeCache();
   if (isFresh(cache[domain])) return cache[domain];
   if (inflight.has(domain)) return inflight.get(domain);
+  const generation = ageCacheGeneration;
   const p = fetchRegistration(domain).then(async (r) => {
     const entry = { ...r, checkedAt: Date.now() };
-    cache[domain] = entry;
-    await saveAgeCache(cache);
+    if (generation !== ageCacheGeneration) return entry; // 查詢期間使用者清除了快取：結果不存
+    const latest = await getAgeCache();
+    latest[domain] = entry;
+    await saveAgeCache(latest);
     return entry;
   }).finally(() => inflight.delete(domain));
   inflight.set(domain, p);
@@ -155,19 +160,29 @@ async function lookupDomainAge(domain) {
  * lookup=false 只用已快取的結果（網頁連結標記、滑過提示，避免把頁面上每個連結的網域都送出去）。
  */
 async function check(url, { lookup = false } = {}) {
-  const [reports, blocklist, settings, cache] = await Promise.all([getReports(), getBlocklist(), getSettings(), getAgeCache()]);
+  const [reports, blocklist, settings] = await Promise.all([getReports(), getBlocklist(), getSettings()]);
   const ctx = { reports, blocklist };
   const domain = settings.domainAgeLookup ? domainForAgeLookup(url, ctx) : null;
-  if (domain && lookup && !isFresh(cache[domain])) await lookupDomainAge(domain);
+  const looked = domain && lookup ? await lookupDomainAge(domain) : null;
+  const cache = await getAgeCache();
+  const entry = domain ? (isFresh(cache[domain]) ? cache[domain] : looked) : null;
   const domainAgeDays = (reg) => {
-    const e = cache[reg];
+    const e = reg === domain && entry ? entry : cache[reg];
     return e?.regDate ? ageInDays(e.regDate) : null;
   };
   const result = assessUrl(url, { ...ctx, domainAgeDays: settings.domainAgeLookup ? domainAgeDays : null });
-  if (result.ok) {
-    result.ageLookup = !domain ? 'skipped' : isFresh(cache[domain]) ? cache[domain].status : 'pending';
-  }
+  if (result.ok) result.ageLookup = !domain ? 'skipped' : entry ? entry.status : 'pending';
   return result;
+}
+
+/** 只用已快取的網域年齡（不對外查詢），給網頁連結的批次標記使用 */
+async function cachedAgeFn() {
+  const [settings, cache] = await Promise.all([getSettings(), getAgeCache()]);
+  if (!settings.domainAgeLookup) return null;
+  return (reg) => {
+    const e = cache[reg];
+    return isFresh(e) && e.regDate ? ageInDays(e.regDate) : null;
+  };
 }
 
 // ---------- 導航攔截 ----------
@@ -262,8 +277,9 @@ const handlers = {
   async clearData({ what }) {
     if (what === 'reports') await chrome.storage.local.remove('reports');
     if (what === 'domainAges') {
-      await chrome.storage.local.remove('domainAges');
+      ageCacheGeneration++;
       ageCachePromise = null;
+      await chrome.storage.local.remove('domainAges');
     }
     return { ok: true };
   },
@@ -283,10 +299,10 @@ const handlers = {
 
   // content script 一次送多個網址，回傳以 host 為 key 的結果
   async checkMany({ urls }) {
-    const [reports, blocklist] = await Promise.all([getReports(), getBlocklist()]);
+    const [reports, blocklist, domainAgeDays] = await Promise.all([getReports(), getBlocklist(), cachedAgeFn()]);
     const out = {};
-    for (const url of urls.slice(0, 500)) {
-      const r = assessUrl(url, { reports, blocklist });
+    for (const url of urls.slice(0, MAX_URLS_PER_BATCH)) {
+      const r = assessUrl(url, { reports, blocklist, domainAgeDays });
       if (r.ok) out[r.host] = { level: r.level, score: r.score, reasons: r.reasons.slice(0, 3), category: r.category };
     }
     return out;

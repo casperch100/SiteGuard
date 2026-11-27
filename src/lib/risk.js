@@ -23,6 +23,20 @@ const MULTI_PART_SUFFIXES = new Set([
   'com.br', 'co.in', 'co.kr',
 ]);
 
+// 任何人都能申請子網域的共用平台（和 tools/eval/common.rb 的 PLATFORMS 保持一致）。
+// 這類網址以「子網域」為單位：回報或放行 scam.github.io 不會影響整個 github.io；
+// 網域年齡是平台本身的年齡，沒有參考價值，所以不查詢。
+export const PLATFORM_SUFFIXES = [
+  'blogspot.com', 'web.app', 'firebaseapp.com', 'vercel.app', 'netlify.app', 'github.io', 'pages.dev', 'workers.dev',
+  'weebly.com', 'wixsite.com', 'square.site', 'godaddysites.com', 'webflow.io', 'glitch.me', 'herokuapp.com',
+  'azurewebsites.net', 'r2.dev', 'framer.app', 'framer.website', 'canva.site', 'my.canva.site', 'onrender.com',
+  'replit.app', 'repl.co', 'wordpress.com', 'mystrikingly.com', 'jimdosite.com', 'ipfs.dweb.link', 'gitbook.io',
+  'notion.site', 'webcindario.com', '000webhostapp.com', 'duckdns.org', 'ngrok-free.app', 'ngrok.io',
+  'trycloudflare.com', 'surge.sh', 'myshopify.com', 'wcomhost.com', 'sites.google.com', 'docs.google.com', 'forms.gle',
+  'storage.googleapis.com', 'firebasestorage.googleapis.com', 's3.amazonaws.com', 'cloudfront.net', 'appspot.com',
+  'typedream.app', 'carrd.co', 'webnode.page',
+];
+
 /** 解析使用者輸入或導航網址。非 http(s) 回傳 null。 */
 export function parseTarget(input) {
   let s = String(input ?? '').trim();
@@ -34,13 +48,14 @@ export function parseTarget(input) {
   const host = u.hostname.toLowerCase().replace(/\.$/, '');
   if (!host) return null;
   const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith('[');
-  const { registrable, suffix } = isIp ? { registrable: host, suffix: '' } : splitDomain(host);
+  const { registrable, suffix, platform } = isIp ? { registrable: host, suffix: '' } : splitDomain(host);
   return {
     url: u.href,
     protocol: u.protocol,
     host,
     registrable,
     suffix,
+    platform: !!platform,
     isIp,
     hasUserInfo: u.username !== '' || u.password !== '',
     userInfo: decodeURIComponent(u.username),
@@ -50,6 +65,15 @@ export function parseTarget(input) {
 export function splitDomain(host) {
   const labels = host.split('.');
   if (labels.length <= 1) return { registrable: host, suffix: '' };
+  // 共用平台的子網域：最長的平台後綴優先（例如 my.canva.site 先於 canva.site）
+  let platform = '';
+  for (const p of PLATFORM_SUFFIXES) {
+    if (host.endsWith('.' + p) && p.length > platform.length) platform = p;
+  }
+  if (platform) {
+    const n = platform.split('.').length + 1;
+    return { registrable: labels.slice(-n).join('.'), suffix: platform, platform: true };
+  }
   const lastTwo = labels.slice(-2).join('.');
   const suffixLen = MULTI_PART_SUFFIXES.has(lastTwo) && labels.length >= 3 ? 2 : 1;
   return {
@@ -144,7 +168,7 @@ export const AGE_RULES = [
  */
 export function domainForAgeLookup(input, { reports = {}, blocklist = null } = {}) {
   const t = parseTarget(input);
-  if (!t || t.isIp || isLocal(t.host) || !t.registrable.includes('.')) return null;
+  if (!t || t.isIp || t.platform || isLocal(t.host) || !t.registrable.includes('.')) return null;
   if (lookupReports(reports, t) || lookupHost(blocklist, t.host, t.registrable) || isAllowlisted(t)) return null;
   return t.registrable;
 }

@@ -21,7 +21,7 @@ export function sectorLabel(sector) {
 /** 和 tools/update_165.rb 的 normalize_host 保持一致 */
 export function normalizeHost(s) {
   let h = String(s ?? '').trim().toLowerCase();
-  h = h.replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/[/?#:\\\s].*$/, '').replace(/\.$/, '').replace(/^www\./, '');
+  h = h.replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/^[^@/]*@/, '').replace(/[/?#:\\\s].*$/, '').replace(/\.$/, '').replace(/^www\./, '');
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) ? h : null;
 }
 

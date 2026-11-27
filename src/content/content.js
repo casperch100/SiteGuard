@@ -13,6 +13,7 @@
     danger: ['危險網站', '#d93025'],
   };
   const MAX_LINKS_PER_SCAN = 2000;
+  const BATCH_SIZE = 200; // 每次送給背景的網址數，要小於等於 background.js 的 MAX_URLS_PER_BATCH
   const cache = new Map(); // host -> result
   const pending = new Set();
 
@@ -48,7 +49,11 @@
     if (!toCheck.size) return;
 
     toCheck.forEach((_, h) => pending.add(h));
-    const results = (await send({ type: 'checkMany', urls: [...toCheck.values()] })) || {};
+    const urls = [...toCheck.values()];
+    const results = {};
+    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+      Object.assign(results, (await send({ type: 'checkMany', urls: urls.slice(i, i + BATCH_SIZE) })) || {});
+    }
     for (const host of toCheck.keys()) {
       cache.set(host, results[host] || null);
       pending.delete(host);
