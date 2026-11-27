@@ -35,9 +35,9 @@ module EvalCommon
 
   # 回傳 [可註冊網域, 是否為共用平台的子網域]
   def registrable(host)
-    PLATFORMS.each do |p|
-      return [host.split('.').last(p.count('.') + 2).join('.'), true] if host.end_with?('.' + p)
-    end
+    # 最長的平台後綴優先（例如 my.canva.site 先於 canva.site），和 src/lib/risk.js 相同
+    p = PLATFORMS.select { |x| host.end_with?('.' + x) }.max_by(&:length)
+    return [host.split('.').last(p.count('.') + 2).join('.'), true] if p
     labels = host.split('.')
     two = labels.last(2).join('.')
     n = MULTI_PART_SUFFIXES.include?(two) && labels.size >= 3 ? 3 : 2

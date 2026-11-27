@@ -25,7 +25,7 @@ OUT = File.join(ROOT, 'eval/data/positives.csv')
 HEADER = %w[collected_at host registrable platform source target reported_at reg_date rdap_status].freeze
 PHISHTANK_URL = ENV['PHISHTANK_URL'] || 'https://data.phishtank.com/data/online-valid.csv' # 可用環境變數覆寫（測試用）
 FRESH_HOURS = 72          # 只收最近 72 小時內通報的，確保是「新的」詐騙網站
-MAX_RDAP_PER_RUN = 400    # 每次最多查詢的網域數，避免對註冊局造成負擔
+MAX_RDAP_PER_RUN = Integer(ENV['MAX_RDAP_PER_RUN'] || 400) # 每次最多查詢的網域數，避免對註冊局造成負擔（環境變數可覆寫，測試用）
 LOG = File.join(ROOT, 'eval/data/collect-log.csv') # 每次收集的結果（成功或失敗、筆數），報告會顯示最近幾次
 LOG_HEADER = %w[run_at runner source status downloaded fresh new_domains rdap_ok rdap_other note].freeze
 
@@ -38,8 +38,18 @@ else
 end
 
 now = Time.now.utc
-candidates = {} # host => {source:, target:, reported_at:}
+candidates = {} # host => {source:, target:, reported_at:, collected_at:}
 runs = {}       # source => {status:, downloaded:, fresh:, note:}
+
+# 上次超過查詢上限、還沒查註冊日期的網域：這次優先處理（保留原本的收集時間）
+PENDING = File.join(ROOT, 'eval/data/rdap-pending.json')
+if File.exist?(PENDING)
+  JSON.parse(File.read(PENDING)).each do |host, c|
+    next if existing.include?(host)
+    candidates[host] = c.transform_keys(&:to_sym)
+  end
+  puts "上次未查完的網域：#{candidates.size} 個" unless candidates.empty?
+end
 
 # --- PhishTank ---
 # 指定 --165 時預設只收 165（避免同一次執行重複下載 PhishTank；未申請金鑰每天只能下載幾次）。
@@ -84,7 +94,7 @@ if (i = ARGV.index('--165'))
     next unless r['民國年月'] == latest
     host = EvalCommon.normalize_host(r['網域'])
     next if host.nil? || older.include?(host) || existing.include?(host) || candidates.key?(host)
-    candidates[host] = { source: '165', target: r['網站性質'].to_s, reported_at: EvalCommon.roc_month_to_iso(latest) }
+    candidates[host] ||= { source: '165', target: r['網站性質'].to_s, reported_at: EvalCommon.roc_month_to_iso(latest) }
     added += 1
   end
   puts "165：#{latest} 新增 #{added} 個網域"
@@ -102,14 +112,21 @@ candidates.each_key do |host|
   by_reg[platform ? nil : reg] << host
 end
 regs = by_reg.keys.compact
+deferred = {}
 if regs.size > MAX_RDAP_PER_RUN
-  puts "本次只查詢前 #{MAX_RDAP_PER_RUN} 個網域（共 #{regs.size} 個），其餘下次再查"
+  puts "本次只查詢前 #{MAX_RDAP_PER_RUN} 個網域（共 #{regs.size} 個），其餘存到 #{File.basename(PENDING)}，下次再查"
   regs = regs.first(MAX_RDAP_PER_RUN)
   keep = Set.new(regs)
-  candidates.select! do |host, _|
+  candidates.each do |host, c|
     reg, platform = EvalCommon.registrable(host)
-    platform || keep.include?(reg)
+    deferred[host] = c unless platform || keep.include?(reg)
   end
+  candidates.reject! { |host, _| deferred.key?(host) }
+end
+if deferred.empty?
+  File.delete(PENDING) if File.exist?(PENDING)
+else
+  File.write(PENDING, JSON.pretty_generate(deferred.transform_values { |c| { collected_at: now.iso8601 }.merge(c) }) + "\n")
 end
 rdap = EvalCommon.rdap_lookup_many(regs, threads: 4)
 
@@ -120,7 +137,7 @@ CSV.open(OUT, 'a') do |out|
     reg, platform = EvalCommon.registrable(host)
     status, date = platform ? ['platform', nil] : (rdap[reg] || ['skipped', nil])
     stats[status] += 1
-    out << [now.iso8601, host, reg, platform ? 1 : 0, c[:source], c[:target], c[:reported_at], date&.to_s, status]
+    out << [c[:collected_at] || now.iso8601, host, reg, platform ? 1 : 0, c[:source], c[:target], c[:reported_at], date&.to_s, status]
   end
 end
 puts "新增 #{candidates.size} 筆：#{stats.map { |k, v| "#{k}=#{v}" }.join(', ')}"

@@ -39,7 +39,8 @@ const kept = lines.filter((l, i) => i === 0 || !l.startsWith(today + ',')); // �
 kept.push(historyRow(results));
 writeFileSync(histPath, kept.join('\n') + '\n');
 
-const [rules, withList] = results;
-console.log(`偵測率（只用規則）：${(rules.detection.rate * 100).toFixed(1)}%（${rules.detection.hit}/${rules.detection.n}）`);
-console.log(`偵測率（加上 165）：${(withList.detection.rate * 100).toFixed(1)}%`);
+// evaluateAll 依序回傳：全部樣本（只用規則）、仍在線樣本（只用規則）、仍在線樣本（規則＋165）
+const [rules, live, withList] = results;
+console.log(`偵測率（只用規則，全部樣本）：${(rules.detection.rate * 100).toFixed(1)}%（${rules.detection.hit}/${rules.detection.n}）`);
+console.log(`偵測率（同一批樣本）：只用規則 ${(live.detection.rate * 100).toFixed(1)}%，加上 165 ${(withList.detection.rate * 100).toFixed(1)}%（n=${live.detection.n}）`);
 console.log(`誤判率：${(rules.falsePositive.rate * 100).toFixed(2)}%（${rules.falsePositive.hit}/${rules.falsePositive.n}）`);

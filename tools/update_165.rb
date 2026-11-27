@@ -11,6 +11,7 @@
 #   - 165反詐騙諮詢專線_遭停止解析涉詐網站  https://data.gov.tw/dataset/176455（每月更新）
 #   - 165反詐騙諮詢專線_假投資(博弈)網站    https://data.gov.tw/dataset/160055（已停止更新，保留歷史資料）
 require 'csv'
+require_relative 'eval/common'
 require 'json'
 require 'net/http'
 require 'uri'
@@ -26,19 +27,13 @@ INVEST_URL = 'https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/0331
 # 和 src/lib/blocklist.js 的 normalizeHost 保持一致
 def normalize_host(s)
   h = s.to_s.strip.downcase
-  h = h.sub(%r{\A[a-z][a-z0-9+.-]*://}, '').sub(%r{[/?#:\\\s].*\z}, '').sub(/\.\z/, '').sub(/\Awww\./, '')
+  h = h.sub(%r{\A[a-z][a-z0-9+.-]*://}, '').sub(/\A[^@\/]*@/, '').sub(%r{[/?#:\\\s].*\z}, '').sub(/\.\z/, '').sub(/\Awww\./, '')
   h =~ /\A[a-z0-9-]+(\.[a-z0-9-]+)+\z/ ? h : nil
 end
 
+# 共用 tools/eval/common.rb 的下載（有逾時設定、處理轉址與 gzip、清掉不合法的 UTF-8 位元組）
 def download(url)
-  uri = URI(url)
-  5.times do
-    res = Net::HTTP.get_response(uri)
-    return res.body.force_encoding('UTF-8') if res.is_a?(Net::HTTPSuccess)
-    raise "下載失敗：#{res.code} #{url}" unless res.is_a?(Net::HTTPRedirection)
-    uri = URI.join(uri.to_s, res['location'])
-  end
-  raise "轉址次數過多：#{url}"
+  EvalCommon.http_get(url)
 end
 
 # 原始資料中的錯字與無意義分類（和 src/lib/blocklist.js 的 SECTOR_FIX 保持一致）

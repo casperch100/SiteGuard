@@ -71,7 +71,7 @@ jobs:
         run: |
           git config user.name "siteguard-eval[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add eval/data/positives.csv eval/data/collect-log.csv eval/REPORT.md eval/history.csv
+          git add -A eval/data/positives.csv eval/data/collect-log.csv eval/data/rdap-pending.json eval/REPORT.md eval/history.csv
           if git diff --cached --quiet; then
             echo "沒有變更"
           else
@@ -81,6 +81,7 @@ jobs:
               if git pull --rebase origin main && git push; then
                 exit 0
               fi
+              git rebase --abort 2>/dev/null || true   # rebase 衝突時先還原，下一輪才能重試
               echo "推送失敗，第 ${attempt} 次重試"; sleep $((attempt * 5))
             done
             echo "::error::三次推送都失敗，今天的評估結果沒有存進 repo"

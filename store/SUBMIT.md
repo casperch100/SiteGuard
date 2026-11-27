@@ -39,7 +39,7 @@ ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh to
 1. **註冊開發人員帳號**
    前往 https://chrome.google.com/webstore/devconsole ，用 Google 帳號登入，支付一次性 5 美元註冊費，並驗證聯絡用電子郵件。帳號需要開啟兩步驟驗證。
    > 如果要以公司名義上架，建議用公司的 Google 帳號，或建立「群組發布者」（Group publisher）。
-2. **上傳套件**：按「新增項目」，上傳 `dist/site-guard-<版本>.zip`（版本號是 `manifest.json` 的 `version`，目前為 0.3.0）。
+2. **上傳套件**：按「新增項目」，上傳 `dist/site-guard-<版本>.zip`（版本號以 `manifest.json` 的 `version` 為準）。
 3. **填寫「商店資訊」**：照 `store/listing.md` 第一節貼上，並上傳圖示、截圖和宣傳圖塊。
 4. **填寫「隱私權」**：照 `store/listing.md` 第二節填寫單一用途、各權限理由、遠端程式碼和資料使用，再填入隱私權政策網址。
 5. **填寫「發布」**：公開範圍、地區和價格照 `listing.md` 第三節。

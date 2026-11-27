@@ -177,3 +177,20 @@ test('Demo 頁的保留網域仍會被規則判為可疑', () => {
   assert.equal(level('https://paypa1.example/signin'), 'suspicious');
   assert.equal(level('https://shopee.example/'), 'suspicious');
 });
+
+test('共用平台：以子網域為單位，不查網域年齡', () => {
+  const t = parseTarget('https://a.scam-shop.github.io/login');
+  assert.equal(t.registrable, 'scam-shop.github.io');
+  assert.equal(t.platform, true);
+  assert.equal(parseTarget('https://x.my.canva.site/').registrable, 'x.my.canva.site'); // 最長的平台後綴優先
+  assert.equal(parseTarget('https://github.io/').platform, false);
+  assert.equal(domainForAgeLookup('https://scam-shop.github.io/'), null);
+  // 回報一個子網域，不會連帶標記同平台的其他網站
+  const reports = { 'scam-shop.github.io': { category: '假購物' } };
+  assert.equal(assessUrl('https://scam-shop.github.io/', { reports }).level, 'danger');
+  assert.equal(assessUrl('https://someone-blog.github.io/', { reports }).level, 'unknown');
+});
+
+test('名單正規化：去掉網址中「@」前面的部分', () => {
+  assert.equal(normalizeHost('https://user:pw@Evil-Site.top/x'), 'evil-site.top');
+});
