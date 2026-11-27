@@ -4,6 +4,10 @@
 
 ## [未發布]
 
+## [0.4.1] - 2026-11-27
+
+修正第四輪程式碼審查（Gemini 與 ChatGPT）找到的問題，其中包括共用服務被判為可信任、`.cc` 等後綴的仿冒漏洞，以及兩個隱私問題。評估結果：偵測率 53.1%、誤判率 0.03%、保留組誤判率 0.18%。
+
 ### 修正（第四輪審查：Gemini 與另一個 LLM）
 - Google 協作平台、Google 表單、Google 雲端硬碟、Cloud Storage 等「以網址路徑區分使用者」的服務，不再沿用服務商的「可信任」判斷；回報與放行只針對那一份內容，不影響整個服務。`googleusercontent.com` 改為共用平台。
 - 開放註冊的國碼後綴（`.cc`、`.co`、`.me`、`.tv` 等）上的品牌同名網域（例如 `paypal.cc`）不再被當成品牌自己的網站。
@@ -107,7 +111,8 @@
 - 第一個版本（POC）：攔截危險網站並顯示警告頁、工具列安全狀態、Popup 查詢與回報、網頁連結標記與滑過提示、右鍵檢查。
 - 啟發式規則：形近字仿冒、同名不同後綴、品牌名稱、「@」偽裝網址、IP 位址、可疑網域後綴與字詞等。
 
-[未發布]: https://github.com/casperch100/SiteGuard/compare/v0.4.0...main
+[未發布]: https://github.com/casperch100/SiteGuard/compare/v0.4.1...main
+[0.4.1]: https://github.com/casperch100/SiteGuard/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/casperch100/SiteGuard/compare/b88d3de...v0.4.0
 [0.3.0]: https://github.com/casperch100/SiteGuard/compare/3105cea...b88d3de
 [0.2.0]: https://github.com/casperch100/SiteGuard/commit/3105cea

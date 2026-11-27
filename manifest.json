@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SiteGuard 網站安全檢查",
   "short_name": "SiteGuard",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "開網站時幫你看一眼：辨識詐騙、仿冒與可疑網站，並標出網頁上的危險連結。",
   "minimum_chrome_version": "114",
   "icons": {
