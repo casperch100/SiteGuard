@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           base_ref="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json baseRefName --jq .baseRefName)"
           title="$(gh pr view "${PR_NUMBER}" --repo "${REPOSITORY}" --json title --jq .title)"
-          git fetch --no-tags origin "${base_ref}"
+          git fetch --no-tags origin "+refs/heads/${base_ref}:refs/remotes/origin/${base_ref}"
           # 審查用的輸入放在 pr-review/：Gemini CLI 不會讀取 .gitignore 裡的路徑（.gemini/ 被忽略）
           mkdir -p .gemini pr-review
 
@@ -82,11 +82,14 @@ jobs:
             fi
           } > pr-review/pr-info.txt
 
-          # 只開放唯讀工具：讀檔、列目錄、搜尋。沒有寫檔、執行指令或連網的工具。
+          # 只開放唯讀工具：讀檔、列目錄、搜尋（tools.core 是內建工具的允許清單）。
+          # 另外用 tools.exclude 明確封鎖執行指令、寫檔、連網與記憶工具，即使允許清單失效也不會被開啟。
+          # 工具名稱見 gemini-cli 的 packages/core/src/tools/definitions/base-declarations.ts
           cat > .gemini/settings.json <<'JSON'
           {
             "tools": {
-              "core": ["read_file", "read_many_files", "list_directory", "glob", "search_file_content"]
+              "core": ["read_file", "read_many_files", "list_directory", "glob", "grep_search"],
+              "exclude": ["run_shell_command", "write_file", "replace", "web_fetch", "google_web_search", "save_memory", "write_todos"]
             },
             "model": { "maxSessionTurns": 30 },
             "telemetry": { "enabled": false }
@@ -144,16 +147,16 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           gemini_cli_version: "${{ vars.GEMINI_CLI_VERSION || 'latest' }}"
           gemini_model: '${{ vars.GEMINI_MODEL }}'
-          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || false) }}'
+          gemini_debug: "${{ vars.GEMINI_DEBUG == 'true' }}"
           workflow_name: 'gemini-review'
           prompt: '${{ steps.prep.outputs.prompt }}'
 
       - name: 'Post review'
-        if: |-
-          ${{ always() && steps.gemini.outcome != 'skipped' }}
+        if: '${{ always() }}'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           OUTCOME: '${{ steps.gemini.outcome }}'
+          PREP_OUTCOME: '${{ steps.prep.outcome }}'
           SUMMARY: '${{ steps.gemini.outputs.summary }}'
           ERROR: '${{ steps.gemini.outputs.error }}'
           RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
@@ -184,6 +187,9 @@ jobs:
           else:
               response = raw
           start = 0 if obj else -1
+          if os.environ.get("PREP_OUTCOME") != "success":
+              print("🤖 審查沒有開始：準備審查資料的步驟失敗了。請看[執行紀錄](%s)。" % os.environ.get("RUN_URL"))
+              raise SystemExit(0)
           if response:
               print("## 🤖 Gemini 程式碼審查\n")
               print(response)

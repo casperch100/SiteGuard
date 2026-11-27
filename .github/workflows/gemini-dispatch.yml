@@ -68,6 +68,8 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: 'Acknowledge request'
+        # 開 PR、推送時不回覆（審查報告本身就會出現）；只有留言要求重新審查時才回覆「收到」
+        if: "${{ github.event_name != 'pull_request' }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -91,26 +93,3 @@ jobs:
       additional_context: '${{ needs.dispatch.outputs.additional_context }}'
     secrets: 'inherit'
 
-  failure:
-    needs:
-      - 'dispatch'
-      - 'review'
-    if: |-
-      ${{ always() && !cancelled() && needs.dispatch.result == 'success' && needs.review.result == 'failure' }}
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
-    steps:
-      - name: 'Send failure comment'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          MESSAGE: |-
-            🤖 抱歉，這次審查失敗了。請看[執行紀錄](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})。最常見的原因是還沒設定 `GEMINI_API_KEY`，或免費額度用完了。
-          REPOSITORY: '${{ github.repository }}'
-        run: |-
-          gh issue comment "${ISSUE_NUMBER}" \
-            --body "${MESSAGE}" \
-            --repo "${REPOSITORY}"
