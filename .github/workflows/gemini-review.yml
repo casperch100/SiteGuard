@@ -46,6 +46,7 @@ jobs:
           persist-credentials: 'false'
 
       - name: 'Prepare diff and settings'
+        id: 'prep'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
@@ -92,6 +93,48 @@ jobs:
           }
           JSON
 
+          # 組出提示：差異不大時直接放進提示，Gemini 不必呼叫任何工具就能寫報告（避免把回合數花在讀檔上）
+          python3 - <<'PY'
+          import os, uuid
+          info = open("pr-review/pr-info.txt", encoding="utf-8").read()
+          diff = open("pr-review/pr.diff", encoding="utf-8", errors="replace").read()
+          INLINE_LIMIT = 60000
+          parts = [
+              "你是這個 repo 的程式碼審查者。請依照 GEMINI.md 的「審查重點」與「回饋格式」，審查這個 Pull Request。",
+              "",
+              "## PR 資訊",
+              info.strip(),
+              "",
+          ]
+          if len(diff.encode("utf-8")) <= INLINE_LIMIT:
+              parts += ["## 完整差異（已排除自動產生的資料檔）", "```diff", diff.rstrip(), "```", "",
+                        "差異已經完整附在上面，不需要再讀 pr-review/ 裡的檔案。"]
+          else:
+              parts += ["## 差異",
+                        "差異太大（%d bytes），沒有放進提示。請用 read_file 分段讀取 pr-review/pr.diff。" % len(diff.encode("utf-8"))]
+          parts += [
+              "需要更多上下文時，可以讀取 repo 中的其他檔案（工作目錄就是這個 PR 的程式碼），但**最多讀 8 個檔案**，",
+              "讀完就一定要輸出審查報告。只審查這個 PR 的變更，以及變更直接影響到的程式。",
+              "",
+              "請直接輸出審查報告（Markdown，繁體中文），格式如下，不要輸出其他內容：",
+              "",
+              "## 總結",
+              "一到三句話：這個 PR 做了什麼、整體評價、是否建議合併。",
+              "",
+              "## 發現的問題",
+              "依嚴重程度由高到低列出（Critical／High／Medium／Low）。每個問題包含：嚴重程度、檔案與行號、問題說明（為什麼是問題）、具體修正建議。",
+              "沒有問題就寫「沒有發現需要修正的問題」。",
+              "",
+              "## 做得好的地方",
+              "簡短列出一到三點。",
+          ]
+          prompt = "\n".join(parts)
+          delim = "PROMPT_" + uuid.uuid4().hex
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"prompt<<{delim}\n{prompt}\n{delim}\n")
+          print("提示長度：%d 字元（差異 %s）" % (len(prompt), "已內嵌" if len(diff.encode("utf-8")) <= INLINE_LIMIT else "需讀檔"))
+          PY
+
       - name: 'Run Gemini review'
         id: 'gemini'
         uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
@@ -103,28 +146,7 @@ jobs:
           gemini_model: '${{ vars.GEMINI_MODEL }}'
           gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || false) }}'
           workflow_name: 'gemini-review'
-          prompt: |-
-            你是這個 repo 的程式碼審查者。請依照 GEMINI.md 的「審查重點」與「回饋格式」，審查這個 Pull Request。
-
-            - PR 資訊與變更的檔案列表：pr-review/pr-info.txt
-            - 完整差異（unified diff，已排除自動產生的資料檔）：pr-review/pr.diff
-
-            先讀這兩個檔案；需要更多上下文時，可以讀取 repo 中的其他檔案（工作目錄就是這個 PR 的程式碼）。
-            只審查這個 PR 的變更，以及變更直接影響到的程式。
-            如果讀不到 pr-review/ 裡的檔案，不要嘗試其他路徑，直接輸出「無法讀取審查資料」以及錯誤原因後結束。
-
-            請直接輸出審查報告（Markdown，繁體中文），格式如下，不要輸出其他內容：
-
-            ## 總結
-            一到三句話：這個 PR 做了什麼、整體評價、是否建議合併。
-
-            ## 發現的問題
-            依嚴重程度由高到低列出（Critical／High／Medium／Low）。每個問題包含：
-            嚴重程度、檔案與行號、問題說明（為什麼是問題）、具體修正建議。
-            沒有問題就寫「沒有發現需要修正的問題」。
-
-            ## 做得好的地方
-            簡短列出一到三點。
+          prompt: '${{ steps.prep.outputs.prompt }}'
 
       - name: 'Post review'
         if: |-
@@ -161,6 +183,18 @@ jobs:
               print("🤖 Gemini 這次沒有產生審查報告（結果：%s）。" % os.environ.get("OUTCOME"))
               print("\n可以留言 `@gemini-cli /review` 再試一次，或查看[執行紀錄](%s)。" % os.environ.get("RUN_URL"))
               detail = err or os.environ.get("ERROR", "")
+              # 附上統計：回合數、工具呼叫次數、模型錯誤，方便判斷原因（例如回合數用完、模型錯誤）
+              try:
+                  stats = obj.get("stats", {}) if start != -1 else {}
+                  models = {k: {"requests": v.get("api", {}).get("totalRequests"), "errors": v.get("api", {}).get("errorsByType")}
+                            for k, v in (stats.get("models") or {}).items()}
+                  tools = stats.get("tools", {})
+                  print("\n<details><summary>執行統計</summary>\n\n```\n%s\n```\n</details>" % json.dumps(
+                      {"models": models, "tool_calls": tools.get("totalCalls"), "tool_failures": tools.get("totalFail"),
+                       "tools_by_name": {k: v.get("count") for k, v in (tools.get("byName") or {}).items()}},
+                      ensure_ascii=False, indent=2))
+              except Exception:
+                  pass
               if detail:
                   print("\n<details><summary>錯誤訊息</summary>\n\n```\n%s\n```\n</details>" % detail[-6000:])
           PY
