@@ -58,8 +58,13 @@ export function parseTarget(input) {
     platform: !!platform,
     isIp,
     hasUserInfo: u.username !== '' || u.password !== '',
-    userInfo: decodeURIComponent(u.username),
+    userInfo: safeDecode(u.username),
   };
+}
+
+// 網址裡的錯誤百分比編碼（例如 %80）會讓 decodeURIComponent 拋出例外：解不開就保留原字串
+function safeDecode(s) {
+  try { return decodeURIComponent(s); } catch { return s; }
 }
 
 export function splitDomain(host) {

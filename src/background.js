@@ -240,8 +240,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // ---------- 右鍵選單 ----------
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({ id: 'check-link', title: '用 SiteGuard 檢查這個連結', contexts: ['link'] });
-  chrome.contextMenus.create({ id: 'check-selection', title: '用 SiteGuard 檢查「%s」', contexts: ['selection'] });
+  // 更新擴充功能時舊的選單可能還在：先全部移除再建立，避免「重複 id」錯誤
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: 'check-link', title: '用 SiteGuard 檢查這個連結', contexts: ['link'] });
+    chrome.contextMenus.create({ id: 'check-selection', title: '用 SiteGuard 檢查「%s」', contexts: ['selection'] });
+  });
   scheduleUpdates();
 });
 
@@ -301,7 +304,7 @@ const handlers = {
   async checkMany({ urls }) {
     const [reports, blocklist, domainAgeDays] = await Promise.all([getReports(), getBlocklist(), cachedAgeFn()]);
     const out = {};
-    for (const url of urls.slice(0, MAX_URLS_PER_BATCH)) {
+    for (const url of (Array.isArray(urls) ? urls : []).slice(0, MAX_URLS_PER_BATCH)) {
       const r = assessUrl(url, { reports, blocklist, domainAgeDays });
       if (r.ok) out[r.host] = { level: r.level, score: r.score, reasons: r.reasons.slice(0, 3), category: r.category };
     }
@@ -338,9 +341,21 @@ const handlers = {
   },
 };
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// 網頁上的 content script 只需要查詢（而且只用快取）；放行、回報、改設定、清除資料只接受擴充功能自己的頁面
+const CONTENT_SCRIPT_TYPES = new Set(['check', 'checkMany']);
+const EXTENSION_ORIGIN = chrome.runtime.getURL('');
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = handlers[msg?.type];
-  if (!handler) return false;
+  if (!handler || sender.id !== chrome.runtime.id) return false;
+  const fromExtensionPage = (sender.url || '').startsWith(EXTENSION_ORIGIN);
+  if (!fromExtensionPage) {
+    if (!CONTENT_SCRIPT_TYPES.has(msg.type)) {
+      sendResponse({ ok: false, error: 'not allowed' });
+      return false;
+    }
+    msg = { ...msg, lookup: false }; // 網頁不能觸發網域年齡查詢
+  }
   handler(msg).then(sendResponse, (err) => sendResponse({ ok: false, error: String(err) }));
   return true; // 非同步回應
 });

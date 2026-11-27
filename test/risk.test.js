@@ -143,6 +143,7 @@ test('RDAP：查詢網址、解析註冊日期、天數與快取', () => {
   assert.equal(isFresh({ regDate: '2026-11-20', checkedAt: now - 29 * 86400000 }, now), true);
   assert.equal(isFresh({ regDate: '2026-11-20', checkedAt: now - 31 * 86400000 }, now), false);
   assert.equal(isFresh({ regDate: null, checkedAt: now - 2 * 86400000 }, now), false); // 查不到的 1 天後重試
+  assert.equal(isFresh({ regDate: null, checkedAt: now - 12 * 3600000 }, now), true);  // 1 天內不重查
 });
 
 test('Punycode（國際化字元）網域加分', () => {
@@ -193,4 +194,10 @@ test('共用平台：以子網域為單位，不查網域年齡', () => {
 
 test('名單正規化：去掉網址中「@」前面的部分', () => {
   assert.equal(normalizeHost('https://user:pw@Evil-Site.top/x'), 'evil-site.top');
+});
+
+test('網址帳號欄位有錯誤編碼時不會出錯', () => {
+  const t = parseTarget('https://user%80@example.com/');
+  assert.equal(t.userInfo, 'user%80');
+  assert.equal(assessUrl('http://www.bank.com%FF@phish.example/').ok, true);
 });
