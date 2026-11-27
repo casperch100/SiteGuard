@@ -57,6 +57,11 @@ jobs:
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
 
+      - name: 'Record start time'
+        id: 'start'
+        run: |-
+          echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${GITHUB_OUTPUT}"
+
       - name: 'Run Gemini pull request review'
         uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
         id: 'gemini_pr_review'
@@ -122,3 +127,42 @@ jobs:
               "https://github.com/gemini-cli-extensions/code-review"
             ]
           prompt: '/pr-code-review'
+
+      # Gemini 有時執行成功卻沒有在 PR 上留下審查（例如留言用的工具失敗、或它判斷沒有問題）。
+      # 這時把它的輸出貼成留言，不必登入看執行紀錄也知道發生什麼事。
+      - name: 'Post Gemini output when no review was posted'
+        if: |-
+          ${{ always() && steps.gemini_pr_review.outcome != 'skipped' }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          PR_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          REPOSITORY: '${{ github.repository }}'
+          STARTED_AT: '${{ steps.start.outputs.time }}'
+          OUTCOME: '${{ steps.gemini_pr_review.outcome }}'
+          SUMMARY: '${{ steps.gemini_pr_review.outputs.summary }}'
+          ERROR: '${{ steps.gemini_pr_review.outputs.error }}'
+        run: |-
+          posted="$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+            --jq "[.[] | select(.submitted_at >= \"${STARTED_AT}\")] | length")"
+          if [ "${posted}" -gt 0 ]; then
+            echo "Gemini 已經留下 ${posted} 則審查，不需要補充。"
+            exit 0
+          fi
+          {
+            echo "🤖 Gemini 執行完成（結果：${OUTCOME}），但沒有在 PR 上留下審查。以下是它的輸出："
+            echo
+            echo '<details><summary>Gemini 輸出</summary>'
+            echo
+            echo '```'
+            printf '%s\n' "${SUMMARY:-（沒有輸出）}" | head -c 60000
+            echo '```'
+            if [ -n "${ERROR}" ]; then
+              echo
+              echo '錯誤訊息：'
+              echo '```'
+              printf '%s\n' "${ERROR}" | tail -c 6000
+              echo '```'
+            fi
+            echo '</details>'
+          } > "${RUNNER_TEMP}/gemini-output.md"
+          gh pr comment "${PR_NUMBER}" --repo "${REPOSITORY}" --body-file "${RUNNER_TEMP}/gemini-output.md"
