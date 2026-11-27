@@ -56,7 +56,7 @@ function ageDays(row, now) {
  * @param {number} [p.windowDays]  只評估最近幾天收集的詐騙網域
  * @param {Date} [p.now]
  */
-export function evaluate({ positives, negatives, blocklist = null, windowDays = 28, now = new Date(), negativeAges = null, excludeSources = [] }) {
+export function evaluate({ positives, negatives, holdout = [], blocklist = null, windowDays = 28, now = new Date(), negativeAges = null, excludeSources = [] }) {
   const since = new Date(now.getTime() - windowDays * 86400000);
   const pos = positives.filter((r) => (!r.collected_at || new Date(r.collected_at) >= since)
     && !excludeSources.includes(r.source));
@@ -82,6 +82,8 @@ export function evaluate({ positives, negatives, blocklist = null, windowDays = 
     return { host: h, aged: typeof negAge(r.registrable) === 'number', ...pick(r) };
   });
   const agedNeg = negResults.filter((r) => r.aged);
+  // 保留組：調整規則時沒看過的熱門網站（沒有查註冊日期，只看網址規則）
+  const holdResults = holdout.map((h) => ({ host: h, ...pick(assessUrl(`https://${h}/`, { blocklist })) }));
 
   const groups = (key) => {
     const m = new Map();
@@ -103,6 +105,7 @@ export function evaluate({ positives, negatives, blocklist = null, windowDays = 
     detection: rate(posResults),
     falsePositive: rate(negResults),
     falsePositiveAged: rate(agedNeg),
+    falsePositiveHoldout: rate(holdResults),
     agedNegatives: agedNeg.length,
     bySource: groups((r) => r.source),
     byPlatform: groups((r) => (r.platform === '1' ? '共用平台子網域' : '獨立網域')),
@@ -142,8 +145,8 @@ function count(arr) {
  *   rulesLive／listLive：只用「收集時仍在線」的樣本（排除 165），分別只用規則、加上 165 名單。
  *   兩者樣本完全相同才能比較；165 樣本本來就在 165 名單裡，放進「加上 165 名單」會變成循環論證。
  */
-export function evaluateAll({ positives, negatives, blocklist, windowDays, negativeAges }) {
-  const base = { positives, negatives, windowDays, negativeAges };
+export function evaluateAll({ positives, negatives, holdout = [], blocklist, windowDays, negativeAges }) {
+  const base = { positives, negatives, holdout, windowDays, negativeAges };
   return [
     evaluate({ ...base, blocklist: null }),
     evaluate({ ...base, blocklist: null, excludeSources: ['165'] }),
@@ -192,6 +195,9 @@ export function toMarkdown(results, { collectLog = '' } = {}) {
   if (main.agedNegatives) {
     lines.push(`| 誤判率（只看查得到註冊日期的 ${main.agedNegatives} 個正常網站） | ≤ ${pct(TARGET.falsePositive)} | ${pct(main.falsePositiveAged.rate)} ${ok(main.falsePositiveAged.rate, TARGET.falsePositive, true)} | ${pct(withList.falsePositiveAged.rate)} ${ok(withList.falsePositiveAged.rate, TARGET.falsePositive, true)} |`);
   }
+  if (main.falsePositiveHoldout.n) {
+    lines.push(`| 誤判率（保留組：調整規則時沒看過的 ${main.falsePositiveHoldout.n} 個熱門網站） | ≤ ${pct(TARGET.falsePositive)} | ${pct(main.falsePositiveHoldout.rate)} ${ok(main.falsePositiveHoldout.rate, TARGET.falsePositive, true)} | ${pct(withList.falsePositiveHoldout.rate)} ${ok(withList.falsePositiveHoldout.rate, TARGET.falsePositive, true)} |`);
+  }
   lines.push(`| 樣本數 | — | 詐騙 ${live.detection.n}／正常 ${live.falsePositive.n} | 詐騙 ${withList.detection.n}／正常 ${withList.falsePositive.n} |`, '');
   const s165 = main.bySource.find((g) => g.key === '165');
   lines.push('兩欄使用**同一批**樣本：收集時仍在線的詐騙網域（PhishTank 等），不含 165 樣本。「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。');
@@ -228,6 +234,7 @@ export function historyRow(results) {
     main.detection.dangerRate.toFixed(4), main.falsePositive.n, main.falsePositive.rate.toFixed(4),
     withList.detection.rate.toFixed(4),
     Number.isFinite(main.falsePositiveAged.rate) ? main.falsePositiveAged.rate.toFixed(4) : '',
-    Number.isFinite(live.detection.rate) ? live.detection.rate.toFixed(4) : ''].join(',');
+    Number.isFinite(live.detection.rate) ? live.detection.rate.toFixed(4) : '',
+    Number.isFinite(main.falsePositiveHoldout.rate) ? main.falsePositiveHoldout.rate.toFixed(4) : ''].join(',');
 }
-export const HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample,detection_rules_live';
+export const HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample,detection_rules_live,false_positive_holdout';
