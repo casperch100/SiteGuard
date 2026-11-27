@@ -172,5 +172,5 @@ store/                     上架資料：商店文案、截圖、送審步驟
 ## 已知的技術限制
 
 - **網域解析**：目前用簡化的公眾後綴表，之後可改用完整的 Public Suffix List。
-- **攔截方式**：目前在 `webNavigation.onBeforeNavigate` 時導向警告頁；改用 `declarativeNetRequest` 規則可以更早攔截。
+- **攔截方式**：目前在 `webNavigation.onBeforeNavigate` 時導向警告頁；改用 `declarativeNetRequest` 規則可以更早攔截，設計見 [DNR-DESIGN.md](DNR-DESIGN.md)。
 - **回報**：只存在使用者自己的電腦。如果要分享給其他使用者，需要後端、防灌票機制與人工審核。
