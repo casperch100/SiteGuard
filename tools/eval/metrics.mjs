@@ -56,7 +56,7 @@ function ageDays(row, now) {
  * @param {number} [p.windowDays]  只評估最近幾天收集的詐騙網域
  * @param {Date} [p.now]
  */
-export function evaluate({ positives, negatives, blocklist = null, windowDays = 28, now = new Date() }) {
+export function evaluate({ positives, negatives, blocklist = null, windowDays = 28, now = new Date(), negativeAges = null }) {
   const since = new Date(now.getTime() - windowDays * 86400000);
   // 使用 165 名單時，排除來源就是 165 的樣本：它們本來就在名單裡，算進去會高估（循環論證）
   const pos = positives.filter((r) => (!r.collected_at || new Date(r.collected_at) >= since)
@@ -71,7 +71,18 @@ export function evaluate({ positives, negatives, blocklist = null, windowDays = 
   const opts = { blocklist, domainAgeDays: (registrable) => ageByReg.get(registrable) ?? null };
 
   const posResults = pos.map((r) => ({ ...r, ...pick(assessUrl(`https://${r.host}/`, opts)) }));
-  const negResults = negatives.map((h) => ({ host: h, ...pick(assessUrl(`https://${h}/`, { blocklist })) }));
+
+  // 正常網域：抽樣查過註冊日期的，也套用網域年齡規則（避免低估誤判率）
+  const negAgeRef = negativeAges?.checkedAt ? new Date(negativeAges.checkedAt) : now;
+  const negAge = (reg) => {
+    const d = negativeAges?.ages?.[reg];
+    return d ? Math.round((negAgeRef - new Date(d)) / 86400000) : null;
+  };
+  const negResults = negatives.map((h) => {
+    const r = assessUrl(`https://${h}/`, { blocklist, domainAgeDays: negAge });
+    return { host: h, aged: typeof negAge(r.registrable) === 'number', ...pick(r) };
+  });
+  const agedNeg = negResults.filter((r) => r.aged);
 
   const groups = (key) => {
     const m = new Map();
@@ -92,8 +103,11 @@ export function evaluate({ positives, negatives, blocklist = null, windowDays = 
     blocklist: blocklist ? `${blocklist.meta?.dataMonth}（${blocklist.hosts.size} 筆）` : '不使用',
     detection: rate(posResults),
     falsePositive: rate(negResults),
+    falsePositiveAged: rate(agedNeg),
+    agedNegatives: agedNeg.length,
     bySource: groups((r) => r.source),
     byPlatform: groups((r) => (r.platform === '1' ? '共用平台子網域' : '獨立網域')),
+    byAgeKnown: groups((r) => (r.reg_date ? '查得到註冊日期' : '查不到註冊日期')),
     age: {
       withDate: ages.length,
       total: nonPlatform.length,
@@ -136,12 +150,15 @@ export function toMarkdown(results) {
   lines.push(`| 偵測率（可疑＋危險） | ≥ ${pct(TARGET.detection)} | ${pct(main.detection.rate)} ${ok(main.detection.rate, TARGET.detection)} | ${pct(withList.detection.rate)} ${ok(withList.detection.rate, TARGET.detection)} |`);
   lines.push(`| 其中判為「危險」 | — | ${pct(main.detection.dangerRate)} | ${pct(withList.detection.dangerRate)} |`);
   lines.push(`| 誤判率（正常網站被判可疑或危險） | ≤ ${pct(TARGET.falsePositive)} | ${pct(main.falsePositive.rate)} ${ok(main.falsePositive.rate, TARGET.falsePositive, true)} | ${pct(withList.falsePositive.rate)} ${ok(withList.falsePositive.rate, TARGET.falsePositive, true)} |`);
+  if (main.agedNegatives) {
+    lines.push(`| 誤判率（只看查得到註冊日期的 ${main.agedNegatives} 個正常網站） | ≤ ${pct(TARGET.falsePositive)} | ${pct(main.falsePositiveAged.rate)} ${ok(main.falsePositiveAged.rate, TARGET.falsePositive, true)} | ${pct(withList.falsePositiveAged.rate)} ${ok(withList.falsePositiveAged.rate, TARGET.falsePositive, true)} |`);
+  }
   lines.push(`| 樣本數 | — | 詐騙 ${main.detection.n}／正常 ${main.falsePositive.n} | 詐騙 ${withList.detection.n}／正常 ${withList.falsePositive.n} |`, '');
   lines.push('「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。「加上 165 名單」不計入來源是 165 的樣本（它們本來就在名單中）。', '');
 
   lines.push('## 偵測率細項（只用規則）', '');
   lines.push('| 分組 | 樣本 | 偵測率 | 危險 |', '|---|---|---|---|');
-  for (const g of [...main.bySource, ...main.byPlatform]) lines.push(`| ${g.key} | ${g.n} | ${pct(g.rate)} | ${pct(g.dangerRate)} |`);
+  for (const g of [...main.bySource, ...main.byPlatform, ...main.byAgeKnown]) lines.push(`| ${g.key} | ${g.n} | ${pct(g.rate)} | ${pct(g.dangerRate)} |`);
   lines.push('');
 
   const a = main.age;
@@ -165,6 +182,7 @@ export function historyRow(results) {
   const [main, withList = main] = results;
   return [main.generatedAt.slice(0, 10), main.windowDays, main.detection.n, main.detection.rate.toFixed(4),
     main.detection.dangerRate.toFixed(4), main.falsePositive.n, main.falsePositive.rate.toFixed(4),
-    withList.detection.rate.toFixed(4)].join(',');
+    withList.detection.rate.toFixed(4),
+    Number.isFinite(main.falsePositiveAged.rate) ? main.falsePositiveAged.rate.toFixed(4) : ''].join(',');
 }
-export const HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165';
+export const HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample';

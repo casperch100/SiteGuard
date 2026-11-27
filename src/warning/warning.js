@@ -8,7 +8,7 @@ async function init() {
   $('host').textContent = host || '（未知網址）';
   $('proceed-host').textContent = host;
 
-  const result = await chrome.runtime.sendMessage({ type: 'check', url });
+  const result = await chrome.runtime.sendMessage({ type: 'check', url, lookup: true });
   if (result?.ok) {
     if (result.category) {
       $('category').textContent = result.category;

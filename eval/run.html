@@ -29,9 +29,10 @@
     const positives = parseCsv(posText);
     const negatives = negText.split('\n').filter(Boolean);
     const blocklist = parseList(listText, JSON.parse(metaText));
+    const negativeAges = await fetch('./cache/negatives_age.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const results = [
-      evaluate({ positives, negatives, blocklist: null, windowDays }),
-      evaluate({ positives, negatives, blocklist, windowDays }),
+      evaluate({ positives, negatives, blocklist: null, windowDays, negativeAges }),
+      evaluate({ positives, negatives, blocklist, windowDays, negativeAges }),
     ];
     window.__evalOutput = { markdown: toMarkdown(results), history: historyRow(results) };
     document.getElementById('report').textContent = window.__evalOutput.markdown;

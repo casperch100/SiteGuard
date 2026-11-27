@@ -22,7 +22,7 @@ async function resolveInitialUrl() {
 
 async function show(url) {
   currentUrl = url;
-  const result = await chrome.runtime.sendMessage({ type: 'check', url });
+  const result = await chrome.runtime.sendMessage({ type: 'check', url, lookup: true });
   const box = $('result');
 
   if (!result?.ok) {
@@ -75,6 +75,11 @@ async function showListInfo() {
   $('list-info').textContent =
     `詐騙網站名單：165 公開資料 ${info.dataMonth ?? ''}，共 ${Number(info.count).toLocaleString('zh-TW')} 筆`;
 }
+
+$('open-options').addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.runtime.openOptionsPage();
+});
 
 resolveInitialUrl().then(show);
 showListInfo();

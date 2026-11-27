@@ -129,13 +129,33 @@ function brandSignal(t) {
   return best;
 }
 
+/** 網域年齡規則的分數（第 5 步依評估結果調整） */
+export const AGE_RULES = [
+  { maxDays: 30, weight: 40, text: (d) => `網域註冊僅 ${d} 天` },
+  { maxDays: 90, weight: 30, text: (d) => `網域註冊未滿 3 個月（${d} 天）` },
+  { maxDays: 180, weight: 15, text: (d) => `網域註冊未滿半年（${d} 天）` },
+];
+
+/**
+ * 這個網址需不需要查詢網域註冊日期？需要的話回傳要查的可註冊網域，否則回傳 null。
+ * 白名單、政府網站、IP 位址、本機網址、165 名單上的網站都不查（不必要，也避免送出多餘的網域）。
+ */
+export function domainForAgeLookup(input, { reports = {}, blocklist = null } = {}) {
+  const t = parseTarget(input);
+  if (!t || t.isIp || isLocal(t.host) || !t.registrable.includes('.')) return null;
+  if (lookupReports(reports, t) || lookupHost(blocklist, t.host, t.registrable) || isAllowlisted(t)) return null;
+  return t.registrable;
+}
+
 /**
  * 評估一個網址的風險。
  * @param {string} input 網址或網域
- * @param {{reports?: Record<string, {category: string}>, blocklist?: {hosts: Map, meta: object}}} [opts]
- *   reports：使用者本機回報；blocklist：165 涉詐網站名單（見 blocklist.js）
+ * @param {{reports?: Record<string, {category: string}>, blocklist?: {hosts: Map, meta: object},
+ *          domainAgeDays?: (registrable: string) => number|null}} [opts]
+ *   reports：使用者本機回報；blocklist：165 涉詐網站名單（見 blocklist.js）；
+ *   domainAgeDays：查詢網域註冊天數（查不到或還沒查回傳 null）
  */
-export function assessUrl(input, { reports = {}, blocklist = null } = {}) {
+export function assessUrl(input, { reports = {}, blocklist = null, domainAgeDays = null } = {}) {
   const t = parseTarget(input);
   if (!t) return { ok: false, input, error: '不是有效的網址' };
 
@@ -178,6 +198,12 @@ export function assessUrl(input, { reports = {}, blocklist = null } = {}) {
     }
   }
 
+  const age = !t.isIp && typeof domainAgeDays === 'function' ? domainAgeDays(t.registrable) : null;
+  if (typeof age === 'number') {
+    const rule = AGE_RULES.find((r) => age <= r.maxDays);
+    if (rule) add(rule.weight, rule.text(age));
+  }
+
   const tld = t.host.split('.').pop();
   if (!t.isIp && SUSPICIOUS_TLDS.has(tld)) add(15, `使用詐騙網站常見的網域後綴「.${tld}」`);
 
@@ -193,7 +219,7 @@ export function assessUrl(input, { reports = {}, blocklist = null } = {}) {
   const level = score >= DANGER_SCORE ? 'danger' : score >= SUSPICIOUS_SCORE ? 'suspicious' : 'unknown';
   reasons.sort((a, b) => b.weight - a.weight);
   if (!reasons.length) reasons.push({ weight: 0, text: '沒有命中任何風險規則' });
-  return { ...base, level, score, reasons };
+  return { ...base, level, score, reasons, ageDays: typeof age === 'number' ? age : null };
 }
 
 function isLocal(host) {

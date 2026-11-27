@@ -23,10 +23,12 @@ const positives = parseCsv(read('eval/data/positives.csv'));
 const negatives = read('eval/cache/negatives.txt').split('\n').filter(Boolean);
 const blocklist = parseList(read('src/data/165-blocklist.txt'), JSON.parse(read('src/data/165-meta.json')));
 const windowDays = Number(arg('--window', 28));
+const agesPath = join(ROOT, 'eval/cache/negatives_age.json');
+const negativeAges = existsSync(agesPath) ? JSON.parse(readFileSync(agesPath, 'utf8')) : null;
 
 const results = [
-  evaluate({ positives, negatives, blocklist: null, windowDays }),
-  evaluate({ positives, negatives, blocklist, windowDays }),
+  evaluate({ positives, negatives, blocklist: null, windowDays, negativeAges }),
+  evaluate({ positives, negatives, blocklist, windowDays, negativeAges }),
 ];
 
 writeFileSync(join(ROOT, 'eval/REPORT.md'), toMarkdown(results));

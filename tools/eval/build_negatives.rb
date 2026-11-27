@@ -13,6 +13,7 @@
 
 require 'fileutils'
 require 'set'
+require 'time'
 require_relative 'common'
 
 ROOT = File.expand_path('../..', __dir__)
@@ -51,3 +52,25 @@ all = (global + tw).uniq
 File.write(OUT, all.join("\n") + "\n")
 File.write(META, "tranco_downloaded=#{File.mtime(zip_path).utc.strftime('%Y-%m-%d')}\nglobal=#{global.size}\ntw=#{tw.size}\ntotal=#{all.size}\n")
 puts "完成：全球前 #{global.size} 名 + .tw 前 #{tw.size} 名，共 #{all.size} 個網域 → #{OUT}"
+
+# --- 正常網域的註冊日期（抽樣） ---
+# 網域年齡規則也可能誤判「剛成立的正常網站」，所以要抽樣查詢正常網域的註冊日期，
+# 誤判率才不會被低估。固定亂數種子，讓每次抽到的樣本一致；30 天內查過就重用。
+require 'json'
+AGES = File.join(CACHE, 'negatives_age.json')
+SAMPLE = (ENV['NEG_AGE_SAMPLE'] || 1000).to_i
+cached = File.exist?(AGES) ? JSON.parse(File.read(AGES)) : {}
+fresh = cached['checkedAt'] && Time.now - Time.parse(cached['checkedAt']) < 30 * 86_400
+if fresh && cached['sample'].to_i >= SAMPLE
+  puts "正常網域註冊日期：使用 #{cached['checkedAt'][0, 10]} 的快取（#{cached['ages'].size} 個）"
+else
+  regs = all.map { |h| EvalCommon.registrable(h) }.reject { |_, platform| platform }.map(&:first).uniq
+  sample = regs.sample(SAMPLE, random: Random.new(20_261_127))
+  puts "查詢 #{sample.size} 個正常網域的註冊日期…"
+  res = EvalCommon.rdap_lookup_many(sample, threads: 6)
+  ages = res.select { |_, r| r[0] == 'ok' }.map { |d, r| [d, r[1].to_s] }.to_h
+  File.write(AGES, JSON.generate('checkedAt' => Time.now.utc.iso8601, 'sample' => sample.size, 'ages' => ages, 'sampleDomains' => sample))
+  st = Hash.new(0)
+  res.each_value { |r| st[r[0]] += 1 }
+  puts "  完成：#{st.map { |k, v| "#{k}=#{v}" }.join(', ')}"
+end

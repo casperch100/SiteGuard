@@ -26,6 +26,7 @@
 
 | 規則 | 分數 |
 |---|---|
+| 網域註冊 30 天內／3 個月內／半年內（RDAP，見下方「網域年齡」） | 40／30／15 |
 | 形近字或錯字仿冒官方網域（`paypa1.com`） | 50 |
 | 和官方網站同名但後綴不同（`shopee.top`） | 45 |
 | 用「@」偽裝網址（`www.bank.com@evil.com`） | 45 |
@@ -37,6 +38,23 @@
 | 未使用 HTTPS、連字號過多、子網域層數過多、主機名稱過長 | 各 10 |
 
 規則用到的白名單、品牌清單、可疑後綴與字詞都在 `src/data/rules.js`。
+
+## 網域年齡（RDAP）
+
+- **查詢對象**：直接查該頂級網域的註冊管理機構。對照表來自 IANA，內建在 `src/data/rdap-bootstrap.json`，由 `tools/update_rdap_bootstrap.rb` 產生。
+- **只送出可註冊網域**（`src/lib/risk.js` 的 `domainForAgeLookup`）。白名單、政府網站、IP、本機網址、165 名單上的網站都不查。
+- **什麼時候查**（`src/background.js`）：
+  - 導航到沒查過的網站時：先放行，背景查詢；查到結果後如果變成「危險」，而且分頁還停在同一個網域，才補上警告頁。
+  - Popup、警告頁主動查詢時（訊息帶 `lookup: true`）。
+  - 網頁連結標記與滑過提示**不查**，只用已快取的結果，避免把頁面上每個連結的網域都送出去。
+- **快取**：`chrome.storage.local` 的 `domainAges`，查到的保存 30 天，查不到的 1 天後重試，最多 3,000 筆。
+- **設定**：`chrome.storage.local` 的 `settings.domainAgeLookup`，預設開啟，可在設定頁（`src/options/`）關閉。
+
+更新 RDAP 對照表：
+
+```bash
+ruby -Ku tools/update_rdap_bootstrap.rb
+```
 
 ## 165 資料
 
@@ -92,7 +110,7 @@ ruby -Ku tools/eval/run_local.rb             # 沒有 Node.js 時用無頭 Chrom
 ## 打包上架
 
 ```bash
-ruby -Ku tools/update_165.rb && sh tools/pack.sh
+ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh tools/pack.sh
 ```
 
 產生 `dist/site-guard-<版本>.zip`，只包含 `manifest.json`、`icons/`、`src/`。送審步驟見 [store/SUBMIT.md](../store/SUBMIT.md)。
@@ -109,9 +127,12 @@ manifest.json              MV3 設定
 src/background.js          Service Worker：攔截、badge、右鍵選單、165 名單載入與每週更新
 src/lib/risk.js            風險判斷引擎（純函式，和測試、評估共用）
 src/lib/blocklist.js       165 名單的解析、查詢、CSV 合併（純函式）
+src/lib/rdap.js            網域註冊日期：查詢網址、解析回應、快取期限（純函式）
 src/data/rules.js          白名單、品牌清單、可疑後綴與字詞
 src/data/165-blocklist.txt 165 名單內建快照
 src/data/165-meta.json     165 名單的分類、資料月份、來源
+src/data/rdap-bootstrap.json  各頂級網域的 RDAP 伺服器（來自 IANA）
+src/options/               設定頁
 src/popup/                 工具列 Popup（也用作右鍵檢查的視窗）
 src/warning/               危險網站警告頁
 src/content/               網頁上的連結標記與滑過提示
@@ -122,6 +143,7 @@ demo/index.html            Demo 測試頁
 test/                      引擎測試
 eval/                      評估資料、報告、每日趨勢
 tools/update_165.rb        下載 165 公開資料並產生內建快照
+tools/update_rdap_bootstrap.rb  下載 IANA 的 RDAP 對照表
 tools/pack.sh              打包上架用的 zip（輸出到 dist/）
 tools/eval/                評估工具
 store/                     上架資料：商店文案、截圖、送審步驟

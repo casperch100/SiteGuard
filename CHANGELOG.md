@@ -4,14 +4,25 @@
 
 ## [未發布]
 
+## [0.3.0] - 2026-11-27
+
 ### 新增
+- **網域年齡判斷**：開啟沒查過的網站時，向該網域的註冊管理機構查詢註冊日期（RDAP），剛註冊 30 天內／3 個月內／半年內的網域分別加 40／30／15 分。
+  - 只送出網域名稱，直接查詢註冊管理機構（對照表來自 IANA，內建在擴充功能中），結果快取 30 天。
+  - 可信任網站、政府網站、165 名單上的網站，以及網頁上的連結都不查詢。
+  - 第一次開啟時先放行、背景查詢，查到結果變成「危險」才補上警告頁。
+- **設定頁**：可以關閉網域年齡查詢、清除回報紀錄與查詢快取。Popup 底部新增「設定」連結。
 - 離線偵測評估機制：每天收集仍在線的詐騙網域，計算新詐騙網站偵測率與正常網站誤判率（GitHub Actions 自動執行，報告見 `eval/REPORT.md`）。
 - 發展計畫 [ROADMAP](ROADMAP.md)、開發文件 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)、Issue 回報範本、[安全性政策](SECURITY.md)。
 - 以 MIT 授權條款釋出程式碼。
 
 ### 變更
+- 隱私權政策新增「查詢網域註冊日期」的說明，並移到 `docs/index.html`。
 - README 改寫為給使用者看的說明，開發相關內容移到 `docs/DEVELOPMENT.md`。
-- 隱私權政策移到 `docs/index.html`。
+
+### 偵測評估（2026-11-27）
+- 新詐騙網站偵測率（只用規則）：0.6% → **29.2%**；PhishTank 仍在線樣本：1.1% → **51.9%**。
+- 正常網站誤判率維持 1.7%（網域年齡規則幾乎沒有增加誤判）。
 
 ## [0.2.0] - 2026-11-26
 
@@ -35,6 +46,7 @@
 - 第一個版本（POC）：攔截危險網站並顯示警告頁、工具列安全狀態、Popup 查詢與回報、網頁連結標記與滑過提示、右鍵檢查。
 - 啟發式規則：形近字仿冒、同名不同後綴、品牌名稱、「@」偽裝網址、IP 位址、可疑網域後綴與字詞等。
 
-[未發布]: https://github.com/casperch100/SiteGuard/compare/6aca90b...HEAD
+[未發布]: https://github.com/casperch100/SiteGuard/compare/HEAD...HEAD
+[0.3.0]: https://github.com/casperch100/SiteGuard/compare/6aca90b...HEAD
 [0.2.0]: https://github.com/casperch100/SiteGuard/commit/3105cea
 [0.1.0]: https://github.com/casperch100/SiteGuard/commit/fcbd912

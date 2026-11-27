@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SiteGuard 網站安全檢查",
   "short_name": "SiteGuard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "開網站前先幫你看一眼：辨識詐騙、仿冒與可疑網站，並標出網頁上的危險連結。",
   "minimum_chrome_version": "114",
   "icons": {
@@ -19,17 +19,35 @@
       "32": "icons/icon32.png"
     }
   },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
   "background": {
     "service_worker": "src/background.js",
     "type": "module"
   },
-  "permissions": ["webNavigation", "storage", "contextMenus", "alarms"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "webNavigation",
+    "storage",
+    "contextMenus",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/content/content.js"],
-      "css": ["src/content/content.css"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/content/content.css"
+      ],
       "run_at": "document_idle"
     }
   ]

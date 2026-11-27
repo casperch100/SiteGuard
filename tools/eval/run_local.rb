@@ -9,7 +9,7 @@ require 'socket'
 require 'tmpdir'
 require 'fileutils'
 
-HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165'
+HISTORY_HEADER = 'date,window_days,positives,detection_rules,danger_rules,negatives,false_positive_rules,detection_with_165,false_positive_aged_sample'
 
 ROOT = File.expand_path('../..', __dir__)
 CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'

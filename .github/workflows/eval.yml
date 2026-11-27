@@ -40,7 +40,9 @@ jobs:
       - name: Cache popular-site ranking
         uses: actions/cache@v4
         with:
-          path: eval/cache/tranco.zip
+          path: |
+            eval/cache/tranco.zip
+            eval/cache/negatives_age.json
           key: tranco-${{ github.run_id }}
           restore-keys: tranco-
 

@@ -22,7 +22,7 @@
 名單每週會在使用者端自動更新，但內建快照越新，剛安裝時的保護越完整：
 
 ```bash
-ruby -Ku tools/update_165.rb && sh tools/pack.sh
+ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh tools/pack.sh
 ```
 
 ### 3. 隱私權政策有改動時，同步到 GitHub Pages
@@ -47,5 +47,5 @@ ruby -Ku tools/update_165.rb && sh tools/pack.sh
 
 ## 之後更新版本
 1. 修改 `manifest.json` 的 `version`（例如 `0.2.1`）。
-2. 執行 `ruby -Ku tools/update_165.rb && sh tools/pack.sh`，更新 165 名單並產生新的 zip。
+2. 執行 `ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh tools/pack.sh`，更新 165 名單與 RDAP 對照表，並產生新的 zip。
 3. 在開發人員資訊主頁的「套件」頁上傳新 zip，再提交審查。

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assessUrl, parseTarget, levenshtein, isAllowedHost } from '../src/lib/risk.js';
+import { assessUrl, parseTarget, levenshtein, isAllowedHost, domainForAgeLookup } from '../src/lib/risk.js';
+import { rdapUrl, parseRegistrationDate, ageInDays, isFresh } from '../src/lib/rdap.js';
 import { parseList, serializeList, lookupHost, mergeSuspendedCsv, normalizeHost, rocMonthLabel, sectorLabel } from '../src/lib/blocklist.js';
 
 // 測試用的小名單（網域取自 165 公開資料）
@@ -102,4 +103,44 @@ test('合併最新 CSV：新增網域、略過白名單、更新資料月份', (
   const r = assessUrl('https://new-scam-shop.top/', { blocklist: { hosts: merged.hosts, meta: merged.meta } });
   assert.equal(r.category, '涉詐網站（電子商務）');
   assert.throws(() => mergeSuspendedCsv('a,b\n1,2\n', LIST), /網域/);
+});
+
+test('網域年齡：新註冊網域加分，舊網域不加分', () => {
+  const age = (days) => () => days;
+  const r = assessUrl('https://tuoho.shop/', { domainAgeDays: age(12) });
+  assert.equal(r.ageDays, 12);
+  assert.ok(r.reasons.some((x) => x.text.includes('12 天')), JSON.stringify(r.reasons));
+  assert.equal(r.level, 'suspicious'); // 40（30 天內）+ 15（可疑後綴）
+  assert.equal(assessUrl('https://tuoho.shop/', { domainAgeDays: age(60) }).score, 45);
+  assert.equal(assessUrl('https://tuoho.shop/', { domainAgeDays: age(400) }).score, 15);
+  assert.equal(assessUrl('https://tuoho.shop/', { domainAgeDays: () => null }).score, 15);
+  // 新網域 + 冒用品牌 + 可疑字詞 → 危險
+  assert.equal(assessUrl('https://line-login.com/', { domainAgeDays: age(5) }).level, 'danger');
+  // 正常的舊網站不受影響
+  assert.equal(assessUrl('https://new-coffee-shop.com/', { domainAgeDays: age(3000) }).level, 'unknown');
+});
+
+test('網域年齡：哪些網址需要查詢', () => {
+  assert.equal(domainForAgeLookup('https://a.b.tuoho.shop/x'), 'tuoho.shop');
+  assert.equal(domainForAgeLookup('https://www.example.com.tw/'), 'example.com.tw');
+  assert.equal(domainForAgeLookup('https://shopee.tw/'), null);           // 白名單
+  assert.equal(domainForAgeLookup('https://www.post.gov.tw/'), null);     // 政府網站
+  assert.equal(domainForAgeLookup('http://203.0.113.45/'), null);         // IP
+  assert.equal(domainForAgeLookup('http://localhost:8000/'), null);       // 本機
+  assert.equal(domainForAgeLookup('https://myship-711-com-tw.cfd/', { blocklist: LIST }), null); // 已在 165 名單
+});
+
+test('RDAP：查詢網址、解析註冊日期、天數與快取', () => {
+  const bootstrap = { tlds: { com: 'https://rdap.verisign.com/com/v1/', tw: 'https://ccrdap.twnic.tw/tw' } };
+  assert.equal(rdapUrl(bootstrap, 'example.com'), 'https://rdap.verisign.com/com/v1/domain/example.com');
+  assert.equal(rdapUrl(bootstrap, 'example.com.tw'), 'https://ccrdap.twnic.tw/tw/domain/example.com.tw');
+  assert.equal(rdapUrl(bootstrap, 'example.zzz'), null);
+  assert.equal(parseRegistrationDate({ events: [{ eventAction: 'last changed', eventDate: '2026-01-01T00:00:00Z' },
+    { eventAction: 'registration', eventDate: '2026-11-20T08:15:00Z' }] }), '2026-11-20');
+  assert.equal(parseRegistrationDate({ events: [] }), null);
+  const now = Date.parse('2026-11-27T12:00:00Z');
+  assert.equal(ageInDays('2026-11-20', now), 7);
+  assert.equal(isFresh({ regDate: '2026-11-20', checkedAt: now - 29 * 86400000 }, now), true);
+  assert.equal(isFresh({ regDate: '2026-11-20', checkedAt: now - 31 * 86400000 }, now), false);
+  assert.equal(isFresh({ regDate: null, checkedAt: now - 2 * 86400000 }, now), false); // 查不到的 1 天後重試
 });

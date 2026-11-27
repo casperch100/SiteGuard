@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiteGuard 設定</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <h1>SiteGuard 設定</h1>
+
+  <section>
+    <h2>判斷方式</h2>
+    <label class="toggle">
+      <input type="checkbox" id="domain-age">
+      <span>
+        <strong>查詢網域註冊日期</strong>
+        <small>開啟沒查過的網站時，向該網域的註冊管理機構查詢註冊日期；剛註冊不久的網站比較可能是詐騙網站。只會送出網域名稱（例如 <code>example.com</code>），不會送出完整網址或任何個人資料，結果在你的電腦上保存 30 天。可信任網站與已列入 165 名單的網站不會查詢。關閉後，新出現的詐騙網站會比較難辨識。</small>
+      </span>
+    </label>
+    <p class="status" id="saved" hidden>已儲存</p>
+  </section>
+
+  <section>
+    <h2>本機資料</h2>
+    <div class="row">
+      <div>
+        <strong>你的回報紀錄</strong>
+        <small id="reports-count">—</small>
+      </div>
+      <button type="button" id="clear-reports">清除</button>
+    </div>
+    <div class="row">
+      <div>
+        <strong>網域註冊日期快取</strong>
+        <small id="ages-count">—</small>
+      </div>
+      <button type="button" id="clear-ages">清除</button>
+    </div>
+  </section>
+
+  <section class="about">
+    <p>詐騙網站名單：<span id="list-info">—</span></p>
+    <p>資料來源：<a href="https://data.gov.tw/dataset/176455" target="_blank" rel="noopener">內政部警政署 165 反詐騙諮詢專線</a>（政府資料開放授權條款第 1 版）</p>
+    <p><a href="https://casperch100.github.io/SiteGuard/" target="_blank" rel="noopener">隱私權政策</a> ·
+      <a href="https://github.com/casperch100/SiteGuard/issues/new/choose" target="_blank" rel="noopener">回報問題</a> ·
+      <span id="version"></span></p>
+  </section>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

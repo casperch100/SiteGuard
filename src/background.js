@@ -2,8 +2,9 @@
 // Service Worker：攔截危險網站、更新工具列 badge、右鍵選單、訊息中心
 // 注意：MV3 Service Worker 隨時可能被回收，狀態一律放 chrome.storage。
 // ============================================================
-import { assessUrl, parseTarget, isAllowedHost, LEVELS } from './lib/risk.js';
+import { assessUrl, parseTarget, isAllowedHost, domainForAgeLookup, LEVELS } from './lib/risk.js';
 import { parseList, serializeList, mergeSuspendedCsv, SUSPENDED_CSV_URL } from './lib/blocklist.js';
+import { rdapUrl, parseRegistrationDate, ageInDays, isFresh, LOOKUP_TIMEOUT_MS } from './lib/rdap.js';
 
 const WARNING_PAGE = chrome.runtime.getURL('src/warning/warning.html');
 const CHECK_PAGE = chrome.runtime.getURL('src/popup/popup.html');
@@ -78,22 +79,125 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 chrome.runtime.onStartup.addListener(scheduleUpdates);
 
-async function check(url) {
-  const [reports, blocklist] = await Promise.all([getReports(), getBlocklist()]);
-  return assessUrl(url, { reports, blocklist });
+// ---------- 設定 ----------
+const DEFAULT_SETTINGS = { domainAgeLookup: true }; // 預設開啟網域年齡查詢（ROADMAP 決定 3）
+
+async function getSettings() {
+  const { settings = {} } = await chrome.storage.local.get('settings');
+  return { ...DEFAULT_SETTINGS, ...settings };
+}
+
+// ---------- 網域年齡（RDAP） ----------
+// 只送可註冊網域（例如 example.com），直接查該頂級網域的註冊局；結果快取 30 天（查不到的 1 天後重試）。
+const AGE_CACHE_MAX = 3000;
+let ageCachePromise = null;
+let bootstrapPromise = null;
+const inflight = new Map();
+
+function getAgeCache() {
+  ageCachePromise ??= chrome.storage.local.get('domainAges').then((o) => o.domainAges || {});
+  return ageCachePromise;
+}
+
+function getBootstrap() {
+  bootstrapPromise ??= fetch(chrome.runtime.getURL('src/data/rdap-bootstrap.json')).then((r) => r.json());
+  return bootstrapPromise;
+}
+
+async function saveAgeCache(cache) {
+  const keys = Object.keys(cache);
+  if (keys.length > AGE_CACHE_MAX) {
+    keys.sort((a, b) => cache[a].checkedAt - cache[b].checkedAt)
+      .slice(0, keys.length - AGE_CACHE_MAX).forEach((k) => delete cache[k]);
+  }
+  await chrome.storage.local.set({ domainAges: cache });
+}
+
+async function fetchRegistration(domain) {
+  const url = rdapUrl(await getBootstrap(), domain);
+  if (!url) return { regDate: null, status: 'no_rdap' };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      credentials: 'omit', referrerPolicy: 'no-referrer', signal: ctrl.signal,
+      headers: { Accept: 'application/rdap+json, application/json' },
+    });
+    if (res.status === 404) return { regDate: null, status: 'not_found' };
+    if (!res.ok) return { regDate: null, status: `http_${res.status}` };
+    const regDate = parseRegistrationDate(await res.json());
+    return { regDate, status: regDate ? 'ok' : 'no_date' };
+  } catch (err) {
+    return { regDate: null, status: err.name === 'AbortError' ? 'timeout' : 'error' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 查詢網域註冊日期（同一網域同時只查一次；有快取就不查） */
+async function lookupDomainAge(domain) {
+  const cache = await getAgeCache();
+  if (isFresh(cache[domain])) return cache[domain];
+  if (inflight.has(domain)) return inflight.get(domain);
+  const p = fetchRegistration(domain).then(async (r) => {
+    const entry = { ...r, checkedAt: Date.now() };
+    cache[domain] = entry;
+    await saveAgeCache(cache);
+    return entry;
+  }).finally(() => inflight.delete(domain));
+  inflight.set(domain, p);
+  return p;
+}
+
+/**
+ * 判斷網址的風險。
+ * lookup=true 時，如果需要且還沒查過，會先查詢網域註冊日期（使用者主動查詢、導航時使用）；
+ * lookup=false 只用已快取的結果（網頁連結標記、滑過提示，避免把頁面上每個連結的網域都送出去）。
+ */
+async function check(url, { lookup = false } = {}) {
+  const [reports, blocklist, settings, cache] = await Promise.all([getReports(), getBlocklist(), getSettings(), getAgeCache()]);
+  const ctx = { reports, blocklist };
+  const domain = settings.domainAgeLookup ? domainForAgeLookup(url, ctx) : null;
+  if (domain && lookup && !isFresh(cache[domain])) await lookupDomainAge(domain);
+  const domainAgeDays = (reg) => {
+    const e = cache[reg];
+    return e?.regDate ? ageInDays(e.regDate) : null;
+  };
+  const result = assessUrl(url, { ...ctx, domainAgeDays: settings.domainAgeLookup ? domainAgeDays : null });
+  if (result.ok) {
+    result.ageLookup = !domain ? 'skipped' : isFresh(cache[domain]) ? cache[domain].status : 'pending';
+  }
+  return result;
 }
 
 // ---------- 導航攔截 ----------
+async function redirectToWarning(tabId, url, result) {
+  const bypass = await getBypass();
+  if (bypass.has(result.registrable)) return false;
+  await chrome.tabs.update(tabId, { url: `${WARNING_PAGE}?url=${encodeURIComponent(url)}` }).catch(() => {});
+  return true;
+}
+
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const result = await check(details.url);
-  if (!result.ok || result.level !== 'danger') return;
-
-  const bypass = await getBypass();
-  if (bypass.has(result.registrable)) return;
-
-  const target = `${WARNING_PAGE}?url=${encodeURIComponent(details.url)}`;
-  chrome.tabs.update(details.tabId, { url: target }).catch(() => {});
+  if (!result.ok) return;
+  if (result.level === 'danger') {
+    await redirectToWarning(details.tabId, details.url, result);
+    return;
+  }
+  // 還沒查過這個網域的註冊日期：先放行，背景查詢；查到有問題再補上警告
+  if (result.ageLookup !== 'pending') return;
+  const later = await check(details.url, { lookup: true });
+  const tab = await chrome.tabs.get(details.tabId).catch(() => null);
+  if (!tab) return;
+  const current = parseTarget(tab.pendingUrl || tab.url);
+  const stillThere = current && current.registrable === later.registrable;
+  if (later.level === 'danger' && stillThere) {
+    await redirectToWarning(details.tabId, details.url, later);
+  } else if (stillThere) {
+    updateBadge(details.tabId, tab.pendingUrl || tab.url).catch(() => {});
+  }
 });
 
 // ---------- 工具列 badge ----------
@@ -139,8 +243,34 @@ chrome.contextMenus.onClicked.addListener((info) => {
 
 // ---------- 訊息 ----------
 const handlers = {
-  async check({ url }) {
-    return check(url);
+  // Popup、警告頁傳 lookup: true（使用者主動查看，可以查詢註冊日期）；網頁上的滑過提示不傳（只用快取）
+  async check({ url, lookup }) {
+    return check(url, { lookup: !!lookup });
+  },
+
+  async getSettings() {
+    return getSettings();
+  },
+
+  async setSettings({ settings }) {
+    const next = { ...(await getSettings()), ...settings };
+    await chrome.storage.local.set({ settings: next });
+    return next;
+  },
+
+  // 設定頁的「清除資料」
+  async clearData({ what }) {
+    if (what === 'reports') await chrome.storage.local.remove('reports');
+    if (what === 'domainAges') {
+      await chrome.storage.local.remove('domainAges');
+      ageCachePromise = null;
+    }
+    return { ok: true };
+  },
+
+  async stats() {
+    const [{ reports = {} }, cache] = await Promise.all([chrome.storage.local.get('reports'), getAgeCache()]);
+    return { reports: Object.keys(reports).length, domainAges: Object.keys(cache).length };
   },
 
   // Popup 顯示 165 資料的版本資訊
