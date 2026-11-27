@@ -163,18 +163,27 @@ jobs:
           python3 - <<'PY' > "${RUNNER_TEMP}/review.md"
           import json, os
           raw = os.environ.get("SUMMARY", "")
-          response, err = "", ""
-          start = raw.find("{")
-          if start != -1:
+          # action 會在輸出後面接上「EOF / gemini_errors<<EOF ...」之類的雜訊，先切掉
+          for marker in ("\nEOF\n", "\ngemini_errors<<"):
+              cut = raw.find(marker)
+              if cut != -1:
+                  raw = raw[:cut]
+          raw = raw.strip()
+          if raw.endswith("EOF"):
+              raw = raw[:-3].rstrip()
+          response, err, obj = "", "", {}
+          # 只有開頭是 { 才當成 JSON；否則就是純文字的審查報告（報告內容本身可能含有 {，不能用「找第一個 {」判斷）
+          if raw.startswith("{"):
               try:
-                  obj, _ = json.JSONDecoder().raw_decode(raw[start:])
+                  obj, _ = json.JSONDecoder().raw_decode(raw)
                   response = (obj.get("response") or "").strip()
                   if obj.get("error"):
                       err = json.dumps(obj["error"], ensure_ascii=False)
               except ValueError:
-                  pass
-          if not response and raw and start == -1:
-              response = raw.strip()  # 不是 JSON 時，直接當成報告
+                  response = raw
+          else:
+              response = raw
+          start = 0 if obj else -1
           if response:
               print("## 🤖 Gemini 程式碼審查\n")
               print(response)
@@ -183,6 +192,8 @@ jobs:
               print("🤖 Gemini 這次沒有產生審查報告（結果：%s）。" % os.environ.get("OUTCOME"))
               print("\n可以留言 `@gemini-cli /review` 再試一次，或查看[執行紀錄](%s)。" % os.environ.get("RUN_URL"))
               detail = err or os.environ.get("ERROR", "")
+              if not raw:
+                  print("\n（Gemini 沒有任何輸出。）")
               # 附上統計：回合數、工具呼叫次數、模型錯誤，方便判斷原因（例如回合數用完、模型錯誤）
               try:
                   stats = obj.get("stats", {}) if start != -1 else {}
