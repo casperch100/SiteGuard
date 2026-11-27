@@ -1,0 +1,114 @@
+# 用 Gemini 自動審查 Pull Request。
+# 改寫自 google-github-actions/run-gemini-cli 的官方範例（examples/workflows/gemini-dispatch），
+# 只保留「審查 PR」：拿掉了 issue 分類、自由指令（invoke）與執行計畫（plan-execute，會寫入 repo）等功能。
+#
+# 觸發方式：
+#   - 開 PR 時自動審查（不含從 fork 來的 PR，避免陌生人消耗額度）
+#   - 在 PR 留言「@gemini-cli /review」重新審查，可以在後面加上想要特別檢查的重點
+#     只有 repo 擁有者或協作者的留言會觸發
+#
+# 需要的設定：repo 的 Settings → Secrets and variables → Actions 新增 Secret「GEMINI_API_KEY」
+#   （到 Google AI Studio 建立：https://aistudio.google.com/apikey）
+# 審查重點與語言：見 repo 根目錄的 GEMINI.md
+name: '🔀 Gemini Dispatch'
+
+on:
+  pull_request:
+    types:
+      - 'opened'
+  pull_request_review_comment:
+    types:
+      - 'created'
+  pull_request_review:
+    types:
+      - 'submitted'
+  issue_comment:
+    types:
+      - 'created'
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  dispatch:
+    # PR：不是從 fork 來的才審查
+    # 留言：開頭是 @gemini-cli /review，而且留言者是 OWNER/MEMBER/COLLABORATOR，而且是在 PR 上留言
+    if: |-
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.fork == false
+      ) || (
+        github.event.sender.type == 'User' &&
+        (github.event_name != 'issue_comment' || github.event.issue.pull_request) &&
+        startsWith(github.event.comment.body || github.event.review.body, '@gemini-cli /review') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association)
+      )
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      pull-requests: 'write'
+    outputs:
+      additional_context: '${{ steps.extract_command.outputs.additional_context }}'
+    steps:
+      - name: 'Extract review request'
+        id: 'extract_command'
+        env:
+          REQUEST: '${{ github.event.comment.body || github.event.review.body }}'
+        run: |-
+          # 「@gemini-cli /review」後面的文字當作額外的審查重點
+          context="${REQUEST#@gemini-cli /review}"
+          {
+            echo 'additional_context<<__EOF__'
+            echo "${context}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+            echo '__EOF__'
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: 'Acknowledge request'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          MESSAGE: |-
+            🤖 收到，Gemini 正在審查這個 PR，大約需要幾分鐘。進度可以看[執行紀錄](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})。
+          REPOSITORY: '${{ github.repository }}'
+        run: |-
+          gh issue comment "${ISSUE_NUMBER}" \
+            --body "${MESSAGE}" \
+            --repo "${REPOSITORY}"
+
+  review:
+    needs: 'dispatch'
+    uses: './.github/workflows/gemini-review.yml'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      issues: 'write'
+      pull-requests: 'write'
+    with:
+      additional_context: '${{ needs.dispatch.outputs.additional_context }}'
+    secrets: 'inherit'
+
+  failure:
+    needs:
+      - 'dispatch'
+      - 'review'
+    if: |-
+      ${{ always() && !cancelled() && needs.dispatch.result == 'success' && needs.review.result == 'failure' }}
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Send failure comment'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          MESSAGE: |-
+            🤖 抱歉，這次審查失敗了。請看[執行紀錄](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})。最常見的原因是還沒設定 `GEMINI_API_KEY`，或免費額度用完了。
+          REPOSITORY: '${{ github.repository }}'
+        run: |-
+          gh issue comment "${ISSUE_NUMBER}" \
+            --body "${MESSAGE}" \
+            --repo "${REPOSITORY}"

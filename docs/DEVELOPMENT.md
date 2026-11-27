@@ -120,6 +120,16 @@ ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh to
 2. 在 [CHANGELOG](../CHANGELOG.md) 記錄這次的變更。
 3. 如果改到資料處理方式，同步更新隱私權政策 `docs/index.html`。
 
+## AI 程式碼審查（Gemini）
+
+改動一律走 Pull Request，由 Gemini 自動審查（`.github/workflows/gemini-dispatch.yml`、`gemini-review.yml`，改寫自 [run-gemini-cli](https://github.com/google-github-actions/run-gemini-cli) 的官方範例）。
+
+- **開 PR 時自動審查**（從 fork 來的 PR 不審查）。
+- 在 PR 留言 `@gemini-cli /review` 可以重新審查，後面可以加上想特別檢查的重點，例如 `@gemini-cli /review 請特別檢查 RDAP 查詢有沒有送出完整網址`。只有 repo 擁有者與協作者的留言會觸發。
+- 審查語言與重點寫在 repo 根目錄的 [GEMINI.md](../GEMINI.md)。
+- 需要在 repo 的 Secrets 設定 `GEMINI_API_KEY`（[Google AI Studio](https://aistudio.google.com/apikey) 建立，有免費額度）。
+- AI 審查只是參考：不會自動合併，也沒有寫入 repo 的權限。
+
 ## 專案結構
 
 ```
