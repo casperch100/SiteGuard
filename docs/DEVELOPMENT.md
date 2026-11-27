@@ -120,6 +120,19 @@ ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh to
 2. 在 [CHANGELOG](../CHANGELOG.md) 記錄這次的變更。
 3. 如果改到資料處理方式，同步更新隱私權政策 `docs/index.html`。
 
+## AI 程式碼審查（Gemini）
+
+改動一律走 Pull Request，由 Gemini 自動審查（`.github/workflows/gemini-dispatch.yml`、`gemini-review.yml`，參考 [run-gemini-cli](https://github.com/google-github-actions/run-gemini-cli) 的官方範例改寫）。
+
+- **開 PR，或 PR 推送新的改動時自動審查**（從 fork 來的 PR 不審查）。
+- 在 PR 留言 `@gemini-cli /review` 可以重新審查，後面可以加上想特別檢查的重點，例如 `@gemini-cli /review 請特別檢查 RDAP 查詢有沒有送出完整網址`。只有 repo 擁有者與協作者的留言會觸發。
+- 審查語言與重點寫在 repo 根目錄的 [GEMINI.md](../GEMINI.md)。workflow 一律從**基準分支**讀取這個檔案放進提示，並關閉 Gemini CLI 自動載入 GEMINI.md 的功能，所以 PR 無法藉由修改或新增 GEMINI.md 改變審查規則（修改要合併後才生效）。
+- 需要在 repo 的 Secrets 設定 `GEMINI_API_KEY`（[Google AI Studio](https://aistudio.google.com/apikey) 建立，有免費額度）。
+- AI 審查只是參考：不會自動合併，也沒有寫入 repo 的權限。審查意見要逐一查證，常有誤判（例如引用過時的版本資訊）。
+- 變更只有自動產生的資料檔或圖片時，會直接略過審查。
+- **運作方式**：workflow 先算出 PR 的差異（排除自動產生的資料檔），Gemini 只負責唯讀地閱讀程式碼並寫出審查報告，再由 workflow 貼到 PR 上。Gemini 沒有任何可以操作 GitHub、寫檔或執行指令的工具。
+- 可以用 repo 變數調整：`GEMINI_MODEL`（指定模型）、`GEMINI_CLI_VERSION`（指定 Gemini CLI 版本）、`GEMINI_DEBUG`（`true` 時輸出除錯紀錄）。
+
 ## 專案結構
 
 ```

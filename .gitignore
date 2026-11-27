@@ -14,3 +14,7 @@ node_modules/
 
 # 評估用的暫存資料（Tranco 排行等，每次重新下載，不重新散布）
 eval/cache/
+
+# Gemini CLI 審查時產生的暫存檔
+.gemini/
+gha-creds-*.json
