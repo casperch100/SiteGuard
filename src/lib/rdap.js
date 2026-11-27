@@ -29,6 +29,8 @@ export function ageInDays(isoDate, now = Date.now()) {
   if (!isoDate) return null;
   const t = Date.parse(`${isoDate}T00:00:00Z`);
   if (Number.isNaN(t)) return null;
+  // 註冊日期在未來（電腦時鐘不準或資料錯誤）：無法判斷，不當成剛註冊
+  if (t > now + 86400000) return null;
   return Math.max(0, Math.floor((now - t) / 86400000));
 }
 

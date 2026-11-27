@@ -13,7 +13,9 @@ module EvalCommon
 
   # 常見的二層公眾後綴（和 src/lib/risk.js 的 MULTI_PART_SUFFIXES 一致，再補幾個常見的）
   # 和 src/lib/risk.js 的 MULTI_PART_SUFFIXES 保持一致
-  MULTI_PART_SUFFIXES = %w[com.tw net.tw org.tw gov.tw edu.tw idv.tw co.uk co.jp com.cn com.hk com.sg com.au com.br co.in co.kr].freeze
+  MULTI_PART_SUFFIXES = %w[
+    com.tw net.tw org.tw gov.tw edu.tw idv.tw co.uk org.uk ac.uk gov.uk co.jp ne.jp or.jp ac.jp com.cn net.cn org.cn gov.cn com.hk com.sg com.my co.id co.th com.vn com.ph com.au net.au org.au co.nz com.br com.mx com.ar com.co com.pe co.in co.kr co.za com.tr com.sa com.eg com.ng com.pk com.bd co.il com.ua
+  ].freeze
 
   # 任何人都能申請子網域的共用平台：子網域是詐騙網站，不代表平台本身是。
   # 這類網址的「網域年齡」是平台的年齡，沒有參考價值，評估時分開統計。
@@ -25,6 +27,7 @@ module EvalCommon
     duckdns.org ngrok-free.app ngrok.io trycloudflare.com surge.sh myshopify.com wcomhost.com
     sites.google.com docs.google.com forms.gle storage.googleapis.com firebasestorage.googleapis.com
     s3.amazonaws.com cloudfront.net appspot.com typedream.app carrd.co webnode.page
+    googleusercontent.com drive.google.com script.google.com
   ].freeze
 
   def normalize_host(s)
