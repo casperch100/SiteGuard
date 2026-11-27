@@ -46,14 +46,18 @@ jobs:
           key: tranco-${{ github.run_id }}
           restore-keys: tranco-
 
+      # 收集資料只在每日排程與手動執行時進行；推送程式變更只重跑評估，
+      # 避免一天多次推送用光 PhishTank 的下載次數（未申請金鑰每天只能下載幾次）
       - name: Collect live scam domains (PhishTank)
+        if: github.event_name != 'push'
         run: ruby tools/eval/collect_positives.rb
 
       # 165 資料每月更新；每月 1、15 日各收一次即可（手動執行時也會收）
       - name: Collect new 165 domains
+        if: github.event_name != 'push'
         run: |
           day=$(date -u +%d)
-          if [ "$day" = "01" ] || [ "$day" = "15" ] || [ "${{ github.event_name }}" != "schedule" ]; then
+          if [ "$day" = "01" ] || [ "$day" = "15" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ruby tools/eval/collect_positives.rb --165 download
           fi
 

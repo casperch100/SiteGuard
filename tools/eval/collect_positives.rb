@@ -2,7 +2,8 @@
 # 收集「仍在線」的詐騙／釣魚網域，並在收集當下查詢註冊日期（RDAP），累積成評估資料集。
 #
 #   ruby -Ku tools/eval/collect_positives.rb            # 每天執行
-#   ruby -Ku tools/eval/collect_positives.rb --165 download   # 另外加入 165 最新一個月新增的網域（也可給本機 CSV 路徑）
+#   ruby -Ku tools/eval/collect_positives.rb --165 download   # 只收 165 最新一個月新增的網域（也可給本機 CSV 路徑）
+#   ruby -Ku tools/eval/collect_positives.rb --165 download --phishtank   # 兩者都收
 #
 # 輸出：eval/data/positives.csv（只附加新網域，不重複）
 #   欄位：collected_at, host, registrable, platform, source, target, reported_at, reg_date, rdap_status
@@ -41,6 +42,10 @@ candidates = {} # host => {source:, target:, reported_at:}
 runs = {}       # source => {status:, downloaded:, fresh:, note:}
 
 # --- PhishTank ---
+# 指定 --165 時預設只收 165（避免同一次執行重複下載 PhishTank；未申請金鑰每天只能下載幾次）。
+# 兩者都要收：加上 --phishtank。
+RUN_PHISHTANK = !ARGV.include?('--165') || ARGV.include?('--phishtank')
+if RUN_PHISHTANK
 begin
   csv_text = EvalCommon.http_get(PHISHTANK_URL, 'User-Agent' => 'phishtank/siteguard-eval')
   rows = CSV.parse(csv_text, headers: true)
@@ -62,6 +67,7 @@ begin
 rescue StandardError => e
   warn "PhishTank 下載失敗：#{e.message}"
   runs['phishtank'] = { status: 'failed', downloaded: 0, fresh: 0, note: e.message[0, 120] }
+end
 end
 
 # --- 165 每月新增（選用） ---
