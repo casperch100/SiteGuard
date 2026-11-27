@@ -1,5 +1,6 @@
 import { LEVELS } from '../lib/risk.js';
 import { REPORT_CATEGORIES } from '../data/rules.js';
+import { feedbackUrl } from '../lib/feedback.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -33,6 +34,7 @@ async function show(url) {
     $('category').hidden = true;
     $('reasons').replaceChildren();
     $('report-section').hidden = true;
+    $('feedback-row').hidden = true;
     return;
   }
 
@@ -47,6 +49,14 @@ async function show(url) {
     li.textContent = r.text;
     return li;
   }));
+
+  // 「判斷錯了？」：可疑／危險 → 回報誤判；沒發現風險 → 回報漏抓（165 名單與自己回報的網站不提供）
+  const fb = feedbackUrl(result, chrome.runtime.getManifest().version);
+  $('feedback-row').hidden = !fb;
+  if (fb) {
+    $('feedback').href = fb;
+    $('feedback').textContent = result.level === 'unknown' ? '這是詐騙網站？回報給開發者' : '判斷錯了？回報誤判';
+  }
 
   $('report-section').hidden = result.level === 'safe';
   $('report-form').hidden = !!result.reported;

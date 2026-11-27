@@ -54,3 +54,8 @@ body:
     attributes:
       label: 補充說明
       description: 為什麼你認為這是詐騙網站？
+  - type: input
+    id: version
+    attributes:
+      label: SiteGuard 版本
+      description: 從擴充功能點「回報給開發者」時會自動填入
