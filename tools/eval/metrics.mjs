@@ -138,7 +138,33 @@ function count(arr) {
 }
 
 /** 產生 Markdown 報告 */
-export function toMarkdown(results) {
+/** 最近的收集紀錄（eval/data/collect-log.csv）轉成報告段落 */
+export function collectLogSection(logText, maxRows = 10) {
+  if (!logText) return [];
+  const rows = parseCsv(logText);
+  if (!rows.length) return [];
+  const recent = rows.slice(-maxRows).reverse();
+  const lines = ['## 最近的資料收集', ''];
+
+  // 連續兩次以上在 GitHub Actions 上 PhishTank 失敗，或下載成功卻沒有任何最近通報 → 提醒
+  const ci = rows.filter((r) => r.runner === 'github-actions' && r.source === 'phishtank').slice(-2);
+  if (ci.length === 2 && ci.every((r) => r.status !== 'ok')) {
+    lines.push(`> ⚠️ GitHub Actions 上最近兩次下載 PhishTank 都失敗：${ci[1].note || '原因不明'}`, '');
+  } else if (ci.length === 2 && ci.every((r) => r.status === 'ok' && Number(r.fresh) === 0)) {
+    lines.push('> ⚠️ GitHub Actions 上最近兩次下載 PhishTank 成功，但都沒有最近 72 小時的通報，資料可能過期或被限制。', '');
+  }
+
+  lines.push('| 時間（UTC） | 執行環境 | 來源 | 結果 | 下載筆數 | 近期通報 | 新增網域 | 查到註冊日期 | 備註 |', '|---|---|---|---|---|---|---|---|---|');
+  for (const r of recent) {
+    const ok = r.status === 'ok' ? '✅ 成功' : '❌ 失敗';
+    const env = r.runner === 'github-actions' ? 'GitHub Actions' : '本機';
+    lines.push(`| ${r.run_at.replace('T', ' ').slice(0, 16)} | ${env} | ${r.source} | ${ok} | ${r.downloaded} | ${r.fresh} | ${r.new_domains} | ${r.rdap_ok} | ${(r.note || '').replace(/\|/g, '／')} |`);
+  }
+  lines.push('', '「近期通報」：PhishTank 是最近 72 小時內通報、已驗證且仍在線的網址數；165 是最新月份新增的網域數。「新增網域」不含之前已收集過的。', '');
+  return lines;
+}
+
+export function toMarkdown(results, { collectLog = '' } = {}) {
   const [main, ...others] = results;
   const ok = (v, t, lower) => (lower ? v <= t : v >= t) ? '✅' : '❌';
   const lines = [];
@@ -155,6 +181,8 @@ export function toMarkdown(results) {
   }
   lines.push(`| 樣本數 | — | 詐騙 ${main.detection.n}／正常 ${main.falsePositive.n} | 詐騙 ${withList.detection.n}／正常 ${withList.falsePositive.n} |`, '');
   lines.push('「只用規則」代表新詐騙網站還沒進任何名單時的表現，是第一階段的主要目標。「加上 165 名單」不計入來源是 165 的樣本（它們本來就在名單中）。', '');
+
+  lines.push(...collectLogSection(collectLog));
 
   lines.push('## 偵測率細項（只用規則）', '');
   lines.push('| 分組 | 樣本 | 偵測率 | 危險 |', '|---|---|---|---|');

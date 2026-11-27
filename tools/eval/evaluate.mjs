@@ -31,7 +31,9 @@ const results = [
   evaluate({ positives, negatives, blocklist, windowDays, negativeAges }),
 ];
 
-writeFileSync(join(ROOT, 'eval/REPORT.md'), toMarkdown(results));
+const logPath = join(ROOT, 'eval/data/collect-log.csv');
+const collectLog = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
+writeFileSync(join(ROOT, 'eval/REPORT.md'), toMarkdown(results, { collectLog }));
 
 const histPath = join(ROOT, 'eval/history.csv');
 const today = results[0].generatedAt.slice(0, 10);

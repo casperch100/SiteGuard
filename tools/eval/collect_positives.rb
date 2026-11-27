@@ -22,9 +22,11 @@ require_relative 'common'
 ROOT = File.expand_path('../..', __dir__)
 OUT = File.join(ROOT, 'eval/data/positives.csv')
 HEADER = %w[collected_at host registrable platform source target reported_at reg_date rdap_status].freeze
-PHISHTANK_URL = 'https://data.phishtank.com/data/online-valid.csv'
+PHISHTANK_URL = ENV['PHISHTANK_URL'] || 'https://data.phishtank.com/data/online-valid.csv' # 可用環境變數覆寫（測試用）
 FRESH_HOURS = 72          # 只收最近 72 小時內通報的，確保是「新的」詐騙網站
 MAX_RDAP_PER_RUN = 400    # 每次最多查詢的網域數，避免對註冊局造成負擔
+LOG = File.join(ROOT, 'eval/data/collect-log.csv') # 每次收集的結果（成功或失敗、筆數），報告會顯示最近幾次
+LOG_HEADER = %w[run_at runner source status downloaded fresh new_domains rdap_ok rdap_other note].freeze
 
 existing = Set.new
 if File.exist?(OUT)
@@ -36,28 +38,36 @@ end
 
 now = Time.now.utc
 candidates = {} # host => {source:, target:, reported_at:}
+runs = {}       # source => {status:, downloaded:, fresh:, note:}
 
 # --- PhishTank ---
 begin
   csv_text = EvalCommon.http_get(PHISHTANK_URL, 'User-Agent' => 'phishtank/siteguard-eval')
   rows = CSV.parse(csv_text, headers: true)
+  # 被擋時常會回傳 HTML 錯誤頁而不是 CSV，所以要檢查欄位
+  raise "格式不符（不是 PhishTank CSV，開頭：#{csv_text[0, 60].gsub(/\s+/, ' ')}）" unless rows.headers.include?('submission_time')
   cutoff = now - FRESH_HOURS * 3600
+  fresh = 0
   rows.each do |r|
     next unless r['verified'] == 'yes' && r['online'] == 'yes'
     t = (Time.parse(r['submission_time']) rescue nil)
     next unless t && t >= cutoff
+    fresh += 1
     host = EvalCommon.normalize_host(r['url'])
     next unless host && !existing.include?(host)
     candidates[host] ||= { source: 'phishtank', target: r['target'].to_s, reported_at: t.utc.iso8601 }
   end
   puts "PhishTank：共 #{rows.size} 筆，最近 #{FRESH_HOURS} 小時的新網域 #{candidates.size} 個"
+  runs['phishtank'] = { status: 'ok', downloaded: rows.size, fresh: fresh }
 rescue StandardError => e
   warn "PhishTank 下載失敗：#{e.message}"
+  runs['phishtank'] = { status: 'failed', downloaded: 0, fresh: 0, note: e.message[0, 120] }
 end
 
 # --- 165 每月新增（選用） ---
 SUSPENDED_165_URL = 'https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/01EFB21E-DB91-4EDF-843F-F45923BBFA1D/download'
 if (i = ARGV.index('--165'))
+ begin
   src = ARGV[i + 1]
   csv165 = src && src != 'download' && File.exist?(src) ? File.read(src, encoding: 'bom|utf-8') : EvalCommon.http_get(SUSPENDED_165_URL).sub(/\A﻿/, '')
   rows = CSV.parse(csv165, headers: true)
@@ -72,6 +82,11 @@ if (i = ARGV.index('--165'))
     added += 1
   end
   puts "165：#{latest} 新增 #{added} 個網域"
+  runs['165'] = { status: 'ok', downloaded: rows.size, fresh: added, note: "資料月份 #{latest}" }
+ rescue StandardError => e
+  warn "165 下載失敗：#{e.message}"
+  runs['165'] = { status: 'failed', downloaded: 0, fresh: 0, note: e.message[0, 120] }
+ end
 end
 
 # --- 查詢註冊日期（以可註冊網域為單位，同一網域只查一次） ---
@@ -103,3 +118,20 @@ CSV.open(OUT, 'a') do |out|
   end
 end
 puts "新增 #{candidates.size} 筆：#{stats.map { |k, v| "#{k}=#{v}" }.join(', ')}"
+
+# --- 記錄這次收集的結果（報告會顯示最近幾次，不用登入 GitHub 也能確認有沒有被擋） ---
+File.write(LOG, LOG_HEADER.join(',') + "\n") unless File.exist?(LOG)
+runner = ENV['GITHUB_ACTIONS'] == 'true' ? 'github-actions' : 'local'
+by_source = Hash.new { |h, k| h[k] = Hash.new(0) }
+candidates.each do |host, c|
+  reg, platform = EvalCommon.registrable(host)
+  status = platform ? 'platform' : (rdap[reg] || ['skipped'])[0]
+  by_source[c[:source]][status == 'ok' ? :ok : :other] += 1
+  by_source[c[:source]][:new] += 1
+end
+CSV.open(LOG, 'a') do |log|
+  runs.each do |source, r|
+    b = by_source[source]
+    log << [now.iso8601, runner, source, r[:status], r[:downloaded], r[:fresh], b[:new], b[:ok], b[:other], r[:note]]
+  end
+end

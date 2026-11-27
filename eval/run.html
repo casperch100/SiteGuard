@@ -34,7 +34,8 @@
       evaluate({ positives, negatives, blocklist: null, windowDays, negativeAges }),
       evaluate({ positives, negatives, blocklist, windowDays, negativeAges }),
     ];
-    window.__evalOutput = { markdown: toMarkdown(results), history: historyRow(results) };
+    const collectLog = await fetch('./data/collect-log.csv', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+    window.__evalOutput = { markdown: toMarkdown(results, { collectLog }), history: historyRow(results) };
     document.getElementById('report').textContent = window.__evalOutput.markdown;
     document.getElementById('history').textContent = window.__evalOutput.history;
   } catch (err) {
