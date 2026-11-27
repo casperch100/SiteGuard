@@ -130,6 +130,12 @@ ruby -Ku tools/update_165.rb && ruby -Ku tools/update_rdap_bootstrap.rb && sh to
 - 需要在 repo 的 Secrets 設定 `GEMINI_API_KEY`（[Google AI Studio](https://aistudio.google.com/apikey) 建立，有免費額度）。
 - AI 審查只是參考：不會自動合併，也沒有寫入 repo 的權限。審查意見要逐一查證，常有誤判（例如引用過時的版本資訊）。
 - 變更只有自動產生的資料檔或圖片時，會直接略過審查。
+- **整體審查（不經過 PR）**：推送 `audit/<範圍>` 分支，Gemini 會審查該範圍**目前的完整程式碼**，報告貼成一則 GitHub Issue，審查完自動刪除分支（`.github/workflows/gemini-audit.yml`）：
+  ```bash
+  git push origin main:audit/src     # 擴充功能核心
+  git push origin main:audit/tools   # 工具與自動化（tools/、.github/）
+  git push origin main:audit/docs    # 文件、測試與 demo
+  ```
 - **運作方式**：workflow 先算出 PR 的差異（排除自動產生的資料檔），Gemini 只負責唯讀地閱讀程式碼並寫出審查報告，再由 workflow 貼到 PR 上。Gemini 沒有任何可以操作 GitHub、寫檔或執行指令的工具。
 - 可以用 repo 變數調整：`GEMINI_MODEL`（指定模型）、`GEMINI_CLI_VERSION`（指定 Gemini CLI 版本）、`GEMINI_DEBUG`（`true` 時輸出除錯紀錄）。
 
