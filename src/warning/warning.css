@@ -67,6 +67,8 @@ h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
 .reasons ul { margin: 0; padding-left: 20px; }
 .reasons li + li { margin-top: 4px; }
 .tip { color: var(--muted); font-size: 14px; }
+.feedback { color: var(--muted); font-size: 13px; }
+.feedback a { color: inherit; font-weight: 600; }
 .actions { margin: 24px 0 16px; }
 button { font: inherit; cursor: pointer; }
 .primary {

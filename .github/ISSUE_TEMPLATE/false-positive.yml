@@ -41,5 +41,5 @@ body:
     id: version
     attributes:
       label: SiteGuard 版本
-      description: 在 chrome://extensions 的 SiteGuard 卡片上可以看到
-      placeholder: 0.2.0
+      description: 從擴充功能點「判斷錯了？」時會自動填入；也可以在 chrome://extensions 的 SiteGuard 卡片上看到
+      placeholder: 0.3.0

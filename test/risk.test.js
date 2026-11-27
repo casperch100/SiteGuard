@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assessUrl, parseTarget, levenshtein, isAllowedHost, domainForAgeLookup, decodePunycodeLabel, idnInfo } from '../src/lib/risk.js';
+import { feedbackUrl, defang } from '../src/lib/feedback.js';
 import { rdapUrl, parseRegistrationDate, ageInDays, isFresh } from '../src/lib/rdap.js';
 import { parseList, serializeList, lookupHost, mergeSuspendedCsv, normalizeHost, rocMonthLabel, sectorLabel, splitCsvLine } from '../src/lib/blocklist.js';
 
@@ -236,4 +237,26 @@ test('剛註冊＋詐騙常見後綴才升為危險', () => {
   assert.equal(level('https://brand-new-shop.top/', at(45)), 'suspicious');  // 超過 30 天
   assert.equal(level('https://brand-new-shop.com/', at(5)), 'suspicious');   // 只有剛註冊
   assert.equal(level('https://old-shop.top/', at(2000)), 'unknown');         // 只有後綴
+});
+
+test('「判斷錯了？」回報網址只帶網域與判斷原因', () => {
+  const r = assessUrl('https://paypa1.com/signin?token=SECRET&email=a@b.c');
+  const u = new URL(feedbackUrl(r, '0.3.0'));
+  assert.equal(u.origin + u.pathname, 'https://github.com/casperch100/SiteGuard/issues/new');
+  assert.equal(u.searchParams.get('template'), 'false-positive.yml');
+  assert.equal(u.searchParams.get('domain'), 'paypa1.com');
+  assert.equal(u.searchParams.get('level'), '可疑（Popup 或連結標示為可疑）');
+  assert.equal(u.searchParams.get('version'), '0.3.0');
+  assert.ok(u.searchParams.get('reasons').includes('PayPal'));
+  assert.ok(!u.href.includes('SECRET') && !u.href.includes('signin') && !u.href.includes('email'), '不能帶入路徑或查詢參數');
+  // 沒發現風險 → 回報漏抓，網域改成 [.]
+  const m = new URL(feedbackUrl(assessUrl('https://new-coffee-shop.com/menu'), '0.3.0'));
+  assert.equal(m.searchParams.get('template'), 'missed-scam.yml');
+  assert.equal(m.searchParams.get('domain'), 'new-coffee-shop[.]com');
+  assert.equal(defang('a.b.c'), 'a[.]b[.]c');
+  // 可信任網站、165 名單、自己回報的網站、無法判斷的網址都不提供
+  assert.equal(feedbackUrl(assessUrl('https://shopee.tw/')), null);
+  assert.equal(feedbackUrl(assessUrl('https://myship-711-com-tw.cfd/', { blocklist: LIST })), null);
+  assert.equal(feedbackUrl(assessUrl('https://x.com/', { reports: { 'x.com': { category: '假購物' } } })), null);
+  assert.equal(feedbackUrl(assessUrl('javascript:alert(1)')), null);
 });

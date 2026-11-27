@@ -1,3 +1,5 @@
+import { feedbackUrl } from '../lib/feedback.js';
+
 const params = new URLSearchParams(location.search);
 const url = params.get('url') || '';
 const $ = (id) => document.getElementById(id);
@@ -19,6 +21,11 @@ async function init() {
       li.textContent = r.text;
       return li;
     }));
+    const fb = feedbackUrl(result, chrome.runtime.getManifest().version);
+    if (fb) {
+      $('feedback').href = fb;
+      $('feedback-row').hidden = false;
+    }
   }
 }
 

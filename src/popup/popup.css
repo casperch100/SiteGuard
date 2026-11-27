@@ -91,5 +91,8 @@ button.link { padding: 0; background: none; color: var(--accent); font-weight: 4
 #reported { display: flex; gap: 8px; align-items: center; }
 #reported[hidden] { display: none; }
 .note { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+.feedback { margin: 8px 0 0; font-size: 12px; }
+.feedback a { color: var(--accent); }
+.feedback .note { display: block; margin-top: 2px; }
 .source { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; line-height: 1.6; }
 .source a { color: inherit; }
