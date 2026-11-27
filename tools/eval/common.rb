@@ -38,6 +38,9 @@ module EvalCommon
     # 最長的平台後綴優先（例如 my.canva.site 先於 canva.site），和 src/lib/risk.js 相同
     p = PLATFORMS.select { |x| host.end_with?('.' + x) }.max_by(&:length)
     return [host.split('.').last(p.count('.') + 2).join('.'), true] if p
+    # 以路徑區分網站的平台（sites.google.com/view/…、docs.google.com/forms/…）：
+    # 主機就是平台本身，網域年齡是平台的年齡，不能拿去查 google.com 的註冊日期
+    return [host, true] if PLATFORMS.include?(host)
     labels = host.split('.')
     two = labels.last(2).join('.')
     n = MULTI_PART_SUFFIXES.include?(two) && labels.size >= 3 ? 3 : 2

@@ -34,58 +34,69 @@
       },
     },
   };
-  // 把 node:test / node:assert 對應到上面的 shim 後執行同一份測試
-  const src = await (await fetch('./risk.test.js')).text();
-  // 單引號、雙引號都接受，避免程式碼格式化後替換失效
-  const patched = src
-    .replace(/import\s*\{[^}]*\btest\b[^}]*\}\s*from\s*['"]node:test['"];?/, 'const { test } = globalThis.__shim;')
-    .replace(/import\s+assert\s+from\s*['"]node:assert\/strict['"];?/, 'const { assert } = globalThis.__shim;')
-    .replace(/(['"])\.\.\/src\//g, `$1${new URL('../src/', location.href)}`);
-  const blobUrl = URL.createObjectURL(new Blob([patched], { type: 'text/javascript' }));
-  await import(blobUrl);
-  URL.revokeObjectURL(blobUrl);
-  await Promise.all(pending);
+  // 載入或執行失敗（例如檔案 404、語法錯誤）時顯示錯誤，不要停在 Running…
+  const showError = (e) => {
+    document.getElementById('summary').textContent = '測試沒有跑完';
+    document.getElementById('summary').className = 'fail';
+    document.getElementById('out').textContent = e?.stack || String(e);
+  };
+  window.addEventListener('unhandledrejection', (ev) => showError(ev.reason));
+  try {
+    // 把 node:test / node:assert 對應到上面的 shim 後執行同一份測試
+    const src = await (await fetch('./risk.test.js')).text();
+    // 單引號、雙引號都接受，避免程式碼格式化後替換失效
+    const patched = src
+      .replace(/import\s*\{[^}]*\btest\b[^}]*\}\s*from\s*['"]node:test['"];?/, 'const { test } = globalThis.__shim;')
+      .replace(/import\s+assert\s+from\s*['"]node:assert\/strict['"];?/, 'const { assert } = globalThis.__shim;')
+      .replace(/(['"])\.\.\/src\//g, `$1${new URL('../src/', location.href)}`);
+    const blobUrl = URL.createObjectURL(new Blob([patched], { type: 'text/javascript' }));
+    await import(blobUrl);
+    URL.revokeObjectURL(blobUrl);
+    await Promise.all(pending);
 
-  // 用真正的 165 名單快照跑一輪：抽樣網域應命中，白名單網站都不應出現在名單中
-  const { assessUrl } = await import('../src/lib/risk.js');
-  const { parseList } = await import('../src/lib/blocklist.js');
-  const { ALLOWLIST } = await import('../src/data/rules.js');
-  const t0 = performance.now();
-  const [text, meta] = await Promise.all([
-    fetch('../src/data/165-blocklist.txt').then((r) => r.text()),
-    fetch('../src/data/165-meta.json').then((r) => r.json()),
-  ]);
-  const blocklist = parseList(text, meta);
-  const parseMs = Math.round(performance.now() - t0);
-  const allowHits = [...ALLOWLIST].filter((d) => assessUrl(d, { blocklist }).listed165);
-  // 內建快照不應包含白名單網站（否則正常網站會被判成危險）：列入測試結果
-  if (allowHits.length) results.push([false, `165 快照不應包含白名單網站 :: ${allowHits.join(', ')}`]);
-  else results.push([true, '165 快照不應包含白名單網站']);
-  const samples = ['https://myship-711-com-tw.cfd/', 'https://einvoiceoa.com/', 'https://www.ycoinit.com/',
-    'https://shopee.top/', 'https://paypa1.com/signin', 'https://line-login-secure.com/', 'https://new-coffee-shop.com/', 'https://shopee.tw/'];
-  const t1 = performance.now();
-  for (let i = 0; i < 1000; i++) assessUrl(samples[i % samples.length], { blocklist });
-  const perCheckUs = Math.round((performance.now() - t1) * 1000 / 1000);
-  document.getElementById('dump').textContent =
-    `snapshot: ${blocklist.hosts.size} hosts, data ${meta.dataMonth}, load+parse ${parseMs} ms, ~${perCheckUs} µs/check\n`
-    + `allowlist sites found in 165 list: ${allowHits.length ? allowHits.join(', ') : 'none'}\n\n`
-    + samples.map((u) => {
-      const r = assessUrl(u, { blocklist });
-      return `${r.level.padEnd(10)} ${String(r.score).padStart(3)}  ${u}\n` + r.reasons.map((x) => `      - ${x.text} (${x.weight})`).join('\n');
-    }).join('\n');
+    // 用真正的 165 名單快照跑一輪：抽樣網域應命中，白名單網站都不應出現在名單中
+    const { assessUrl } = await import('../src/lib/risk.js');
+    const { parseList } = await import('../src/lib/blocklist.js');
+    const { ALLOWLIST } = await import('../src/data/rules.js');
+    const t0 = performance.now();
+    const [text, meta] = await Promise.all([
+      fetch('../src/data/165-blocklist.txt').then((r) => r.text()),
+      fetch('../src/data/165-meta.json').then((r) => r.json()),
+    ]);
+    const blocklist = parseList(text, meta);
+    const parseMs = Math.round(performance.now() - t0);
+    const allowHits = [...ALLOWLIST].filter((d) => assessUrl(d, { blocklist }).listed165);
+    // 內建快照不應包含白名單網站（否則正常網站會被判成危險）：列入測試結果
+    if (allowHits.length) results.push([false, `165 快照不應包含白名單網站 :: ${allowHits.join(', ')}`]);
+    else results.push([true, '165 快照不應包含白名單網站']);
+    const samples = ['https://myship-711-com-tw.cfd/', 'https://einvoiceoa.com/', 'https://www.ycoinit.com/',
+      'https://shopee.top/', 'https://paypa1.com/signin', 'https://line-login-secure.com/', 'https://new-coffee-shop.com/', 'https://shopee.tw/'];
+    const t1 = performance.now();
+    for (let i = 0; i < 1000; i++) assessUrl(samples[i % samples.length], { blocklist });
+    const perCheckUs = Math.round((performance.now() - t1) * 1000 / 1000);
+    document.getElementById('dump').textContent =
+      `snapshot: ${blocklist.hosts.size} hosts, data ${meta.dataMonth}, load+parse ${parseMs} ms, ~${perCheckUs} µs/check\n`
+      + `allowlist sites found in 165 list: ${allowHits.length ? allowHits.join(', ') : 'none'}\n\n`
+      + samples.map((u) => {
+        const r = assessUrl(u, { blocklist });
+        return `${r.level.padEnd(10)} ${String(r.score).padStart(3)}  ${u}\n` + r.reasons.map((x) => `      - ${x.text} (${x.weight})`).join('\n');
+      }).join('\n');
 
-  // 結果最後才輸出，讓上面的快照檢查也算進通過／失敗數
-  const fails = results.filter(([ok]) => !ok).length;
-  document.getElementById('summary').textContent = `${results.length - fails} passed, ${fails} failed`;
-  document.getElementById('summary').className = fails ? 'fail' : 'pass';
-  // 用 textContent 建立節點，測試名稱或錯誤訊息裡的 < > 不會被當成 HTML
-  const out = document.getElementById('out');
-  out.replaceChildren(...results.flatMap(([ok, n], i) => {
-    const span = document.createElement('span');
-    span.className = ok ? 'pass' : 'fail';
-    span.textContent = `${ok ? 'PASS' : 'FAIL'} ${n}`;
-    return i ? [document.createTextNode('\n'), span] : [span];
-  }));
+    // 結果最後才輸出，讓上面的快照檢查也算進通過／失敗數
+    const fails = results.filter(([ok]) => !ok).length;
+    document.getElementById('summary').textContent = `${results.length - fails} passed, ${fails} failed`;
+    document.getElementById('summary').className = fails ? 'fail' : 'pass';
+    // 用 textContent 建立節點，測試名稱或錯誤訊息裡的 < > 不會被當成 HTML
+    const out = document.getElementById('out');
+    out.replaceChildren(...results.flatMap(([ok, n], i) => {
+      const span = document.createElement('span');
+      span.className = ok ? 'pass' : 'fail';
+      span.textContent = `${ok ? 'PASS' : 'FAIL'} ${n}`;
+      return i ? [document.createTextNode('\n'), span] : [span];
+    }));
+  } catch (e) {
+    showError(e);
+  }
 </script>
 </body>
 </html>

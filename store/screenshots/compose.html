@@ -100,7 +100,7 @@
         <p>開網站前先幫你看一眼<br>內建 165 公告的涉詐網站名單</p>
       </div>`);
   } else {
-    const s = SCENES[scene];
+    const s = SCENES[scene] ?? SCENES[1]; // 不認得的 scene 就用第 1 張
     document.body.insertAdjacentHTML('afterbegin', `
       <div class="copy">
         <div class="brand"><img src="${ICON}" alt="">SiteGuard 網站安全檢查</div>
